@@ -74,37 +74,54 @@ def _to_float(val) -> float:
 
 def build_ranking(records: list[dict], as_of_date: str = None) -> list[dict]:
     """
-    as_of_date(YYYY-MM-DD) 이하의 공시 중 인물별 가장 최근 레코드를 선택.
-    sp_stock_lmp_cnt = 해당 공시 시점의 상장주식 보유수량
-    """
-    # 기준일 이하 레코드만 사용
-    if as_of_date:
-        records = [r for r in records if r.get("rcept_dt", "") <= as_of_date]
+    as_of_date(YYYY-MM-DD) 기준 각 인물의 보유량을 추정.
 
-    # 성명별 최신 레코드 선택 (rcept_dt 기준)
-    latest: dict[str, dict] = {}
+    케이스 A: 기준일 이전 공시가 있으면 → 그 중 최신 공시의 sp_stock_lmp_cnt 사용
+    케이스 B: 기준일 이전 공시가 없으면 → 기준일 이후 첫 공시에서
+              sp_stock_lmp_cnt - sp_stock_lmp_irds_cnt 로 역산
+    """
+    # 인물별 전체 공시 목록 수집
+    person_records: dict[str, list[dict]] = {}
     for r in records:
         nm = r.get("repror", "").strip()
         if not nm:
             continue
-        rcept_dt = r.get("rcept_dt", "").strip()
-        if nm not in latest or rcept_dt > latest[nm].get("rcept_dt", ""):
-            latest[nm] = r
+        person_records.setdefault(nm, []).append(r)
 
     result = []
-    for nm, r in latest.items():
-        holdings = _to_int(r.get("sp_stock_lmp_cnt", 0))
-        change   = _to_int(r.get("sp_stock_lmp_irds_cnt", 0))
-        rate     = _to_float(r.get("sp_stock_lmp_rate", 0))
+    for nm, recs in person_records.items():
+        recs_sorted = sorted(recs, key=lambda x: x.get("rcept_dt", ""))
+
+        if as_of_date:
+            before = [r for r in recs_sorted if r.get("rcept_dt", "") <= as_of_date]
+            after  = [r for r in recs_sorted if r.get("rcept_dt", "") >  as_of_date]
+        else:
+            before = recs_sorted
+            after  = []
+
+        if before:
+            # 케이스 A: 기준일 이전 최신 공시 그대로 사용
+            ref = before[-1]
+            holdings = _to_int(ref.get("sp_stock_lmp_cnt", 0))
+            note = ref.get("rcept_dt", "-")
+        elif after:
+            # 케이스 B: 기준일 이후 첫 공시에서 역산
+            ref = after[0]
+            holdings = _to_int(ref.get("sp_stock_lmp_cnt", 0)) \
+                     - _to_int(ref.get("sp_stock_lmp_irds_cnt", 0))
+            note = f"{ref.get('rcept_dt','-')} 역산"
+        else:
+            continue
+
         result.append({
             "성명":       nm,
-            "직위":       r.get("isu_exctv_ofcps", "-").strip(),
-            "등기여부":   r.get("isu_exctv_rgist_at", "-").strip(),
-            "주요주주":   r.get("isu_main_shrholdr", "-").strip(),
-            "보유주식수": holdings,
-            "증감":       change,
-            "보유비율":   rate,
-            "최근보고일": r.get("rcept_dt", "-").strip(),
+            "직위":       ref.get("isu_exctv_ofcps", "-").strip(),
+            "등기여부":   ref.get("isu_exctv_rgist_at", "-").strip(),
+            "주요주주":   ref.get("isu_main_shrholdr", "-").strip(),
+            "보유주식수": max(holdings, 0),
+            "증감":       _to_int(ref.get("sp_stock_lmp_irds_cnt", 0)),
+            "보유비율":   _to_float(ref.get("sp_stock_lmp_rate", 0)),
+            "최근보고일": note,
         })
 
     ranked = sorted(result, key=lambda x: x["보유주식수"], reverse=True)
