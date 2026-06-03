@@ -154,9 +154,41 @@ def print_ranking(ranking: list[dict], period: str):
     print(f"  총 {len(ranking)}명\n")
 
 
-# ──────────────────────────────────────────────
-# 엑셀 저장
-# ──────────────────────────────────────────────
+def search_person(all_rows: list[dict], name: str, bgn: str = "2023-01-01", end: str = "2024-12-31"):
+    """특정 인물의 공시 이력을 기간 내에서 전부 출력."""
+    hits = [
+        r for r in all_rows
+        if name in r.get("repror", "") and bgn <= r.get("rcept_dt", "") <= end
+    ]
+    sep = "─" * 70
+    print(f"\n{'═'*70}")
+    print(f"  '{name}' 공시 이력  ({bgn} ~ {end})")
+    print(f"{'═'*70}")
+    if not hits:
+        print(f"  해당 기간에 '{name}' 공시 없음")
+        # 전체 기간에서도 확인
+        all_hits = [r for r in all_rows if name in r.get("repror", "")]
+        if all_hits:
+            dates = sorted(set(r.get("rcept_dt", "") for r in all_hits))
+            print(f"  ※ 전체 이력에는 존재: {dates}")
+        else:
+            print(f"  ※ 전체 이력에도 없음 (이름 철자 확인 필요)")
+    else:
+        hits_sorted = sorted(hits, key=lambda x: x.get("rcept_dt", ""))
+        print(f"  {'접수일':<12} {'직위':<12} {'등기여부':<12} {'보유주식수':>12} {'증감':>10}")
+        print(sep)
+        for r in hits_sorted:
+            print(
+                f"  {r.get('rcept_dt',''):<12} "
+                f"{r.get('isu_exctv_ofcps',''):<12} "
+                f"{r.get('isu_exctv_rgist_at',''):<12} "
+                f"{_to_int(r.get('sp_stock_lmp_cnt',0)):>12,} "
+                f"{_to_int(r.get('sp_stock_lmp_irds_cnt',0)):>+10,}"
+            )
+    print(sep + "\n")
+
+
+
 
 HEADER_FILL = PatternFill("solid", fgColor="1F4E79")
 RANK1_FILL  = PatternFill("solid", fgColor="FFD700")
@@ -258,6 +290,9 @@ def main():
         sys.exit(1)
 
     records = all_rows
+
+    # 특정 인물 검색 (이름 일부만 입력 가능)
+    search_person(all_rows, "임창문", bgn="2023-01-01", end="2024-12-31")
 
     if not records:
         print("조회 가능한 데이터가 없습니다.")
