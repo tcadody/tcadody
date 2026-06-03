@@ -243,11 +243,9 @@ def main():
         print("  설정: set DART_API_KEY=발급받은키  (Windows)")
         sys.exit(1)
 
-    # 최근 3년치 소유보고 이력 조회
-    today = datetime.today()
-    end_de = today.strftime("%Y%m%d")
-    bgn_de = today.replace(year=today.year - 3).strftime("%Y%m%d")
-    label_year = str(today.year - 1)
+    # 2026년 데이터만 조회
+    bgn_de = "20260101"
+    end_de = datetime.today().strftime("%Y%m%d")
 
     print(f"  SK하이닉스 임원·주요주주 소유보고 조회 중 ({bgn_de} ~ {end_de})...", end=" ", flush=True)
     try:
@@ -258,19 +256,25 @@ def main():
 
     if not records:
         print("데이터 없음")
-        print("조회된 소유보고 데이터가 없습니다. API 키 또는 조회 기간을 확인해주세요.")
+        print("2026년 소유보고 데이터가 없습니다.")
         sys.exit(1)
 
     print(f"{len(records)}건 수신")
 
+    # 실제 필드명 확인 (첫 번째 레코드 출력)
+    print("\n[진단] 첫 번째 레코드 필드:")
+    for k, v in records[0].items():
+        print(f"  {k}: {v}")
+    print()
+
     ranking = build_ranking(records)
-    print_ranking(ranking, label_year, "임원·주요주주 소유보고 (최근 3년)")
+    print_ranking(ranking, "2026", "임원·주요주주 소유보고")
 
     out_path = os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
-        f"sk_hynix_holdings_{label_year}.xlsx",
+        "sk_hynix_holdings_2026.xlsx",
     )
-    save_to_excel(ranking, label_year, "임원·주요주주 소유보고", out_path)
+    save_to_excel(ranking, "2026", "임원·주요주주 소유보고", out_path)
     return out_path
 
 
