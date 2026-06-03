@@ -275,87 +275,41 @@ def main():
         print("  설정: set DART_API_KEY=발급받은키  (Windows cmd)")
         sys.exit(1)
 
-    today  = datetime.today()
-    end_de = today.strftime("%Y%m%d")
+    # 연도 입력 (명령줄 인수 또는 직접 입력)
+    if len(sys.argv) > 1:
+        year_input = sys.argv[1].strip()
+    else:
+        year_input = input("조회 연도 입력 (기본값 2026, Enter 시 2026 사용): ").strip()
+        if not year_input:
+            year_input = "2026"
 
-    # 공시연도 2022~2024 범위로 필터링
-    BGN  = "2022-01-01"
-    AS_OF = "2024-12-31"
-    period = f"공시연도 {BGN} ~ {AS_OF} 중 인물별 최신 공시 기준"
+    if not year_input.isdigit() or len(year_input) != 4:
+        print(f"오류: 연도는 4자리 숫자로 입력하세요 (예: 2024)")
+        sys.exit(1)
 
+    AS_OF  = f"{year_input}-12-31"
+    period = f"{year_input}년 기준 (공시일 {AS_OF} 이전 최신 보유수량)"
+    out_file = f"sk_hynix_holdings_{year_input}.xlsx"
+
+    print(f"\n  조회 연도: {year_input}년")
     print(f"  전체 이력 조회 중...", end=" ", flush=True)
     try:
-        all_rows = fetch_elestock(api_key, "20000101", end_de)
+        all_rows = fetch_elestock(api_key, "20000101", datetime.today().strftime("%Y%m%d"))
         print(f"{len(all_rows)}건 수신")
     except Exception as e:
         print(f"실패 ({e})")
         sys.exit(1)
 
-    records = all_rows
-
-    # ── 2022~2024 범위 인물 목록 출력 ────────────────────────
-    from collections import defaultdict
-    person_dates: dict[str, list[str]] = defaultdict(list)
-    for r in all_rows:
-        nm = r.get("repror", "").strip()
-        dt = r.get("rcept_dt", "")
-        if nm and BGN <= dt <= AS_OF:
-            person_dates[nm].append(dt)
-
-    print("\n" + "═"*70)
-    print(f"  공시연도 {BGN} ~ {AS_OF} 에 포함된 인물 목록")
-    print("═"*70)
-    for nm in sorted(person_dates):
-        dates = sorted(person_dates[nm])
-        print(f"  {nm:<12} {dates[0]} ~ {dates[-1]}  ({len(dates)}건)")
-    print(f"  총 {len(person_dates)}명")
-    print("═"*70 + "\n")
-
-    # ── 특정 인물 검색 ──────────────────────────────────────
-    search_person(all_rows, "임창문", bgn=BGN, end=AS_OF)
-
-    if not records:
-        print("조회 가능한 데이터가 없습니다.")
-        sys.exit(1)
-
-    ranking = build_ranking(records, bgn_date=BGN, as_of_date=AS_OF)
+    ranking = build_ranking(all_rows, as_of_date=AS_OF)
 
     if not ranking:
-        print("랭킹 데이터를 생성할 수 없습니다.")
+        print(f"  {year_input}년 이전 공시 데이터가 없습니다.")
         sys.exit(1)
 
     print_ranking(ranking, period)
 
-    out_path = os.path.join(
-        os.path.dirname(os.path.abspath(__file__)),
-        "sk_hynix_holdings_2024.xlsx",
-    )
+    out_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), out_file)
     save_to_excel(ranking, period, out_path)
-
-    # ── 사업보고서 임원현황에서 임창문 검색 (2022~2024년) ────
-    print("\n" + "═"*70)
-    print("  [추가 검색] 사업보고서 임원현황(hyslrSttus)에서 임창문 검색")
-    print("═"*70)
-    TARGET = "임창문"
-    found_any = False
-    for year in ["2022", "2023", "2024"]:
-        try:
-            execs = fetch_executives(api_key, year)
-        except Exception as e:
-            print(f"  {year}년 조회 실패: {e}")
-            continue
-        hits = [e for e in execs if TARGET in e.get("nm", "")]
-        if hits:
-            found_any = True
-            print(f"\n  ▶ {year}년 사업보고서에서 발견 ({len(hits)}건):")
-            for h in hits:
-                print(f"     성명: {h.get('nm','')}  직위: {h.get('ofcps','')}  등기여부: {h.get('rgist_exctv_at','')}  최종학력: {h.get('edtn_bkgd','')}")
-        else:
-            print(f"  {year}년 사업보고서: '{TARGET}' 없음")
-    if not found_any:
-        print(f"\n  ※ 2022~2024년 사업보고서 임원현황 어디에도 '{TARGET}' 없음")
-        print("     → 이름 철자 확인 또는 임원 등재 전 시점일 수 있음")
-    print("═"*70)
 
 
 if __name__ == "__main__":
