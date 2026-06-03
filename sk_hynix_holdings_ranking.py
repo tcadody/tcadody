@@ -72,56 +72,38 @@ def _to_float(val) -> float:
         return 0.0
 
 
-def build_ranking(records: list[dict], as_of_date: str = None) -> list[dict]:
+def build_ranking(records: list[dict], bgn_date: str = None, as_of_date: str = None) -> list[dict]:
     """
-    as_of_date(YYYY-MM-DD) 기준 각 인물의 보유량을 추정.
+    bgn_date ~ as_of_date 기간 내 공시만 사용.
+    인물별 가장 최신 공시의 sp_stock_lmp_cnt 를 보유수량으로 사용.
+    """
+    filtered = records
+    if bgn_date:
+        filtered = [r for r in filtered if r.get("rcept_dt", "") >= bgn_date]
+    if as_of_date:
+        filtered = [r for r in filtered if r.get("rcept_dt", "") <= as_of_date]
 
-    케이스 A: 기준일 이전 공시가 있으면 → 그 중 최신 공시의 sp_stock_lmp_cnt 사용
-    케이스 B: 기준일 이전 공시가 없으면 → 기준일 이후 첫 공시에서
-              sp_stock_lmp_cnt - sp_stock_lmp_irds_cnt 로 역산
-    """
-    # 인물별 전체 공시 목록 수집
-    person_records: dict[str, list[dict]] = {}
-    for r in records:
+    # 성명별 최신 레코드 선택
+    latest: dict[str, dict] = {}
+    for r in filtered:
         nm = r.get("repror", "").strip()
         if not nm:
             continue
-        person_records.setdefault(nm, []).append(r)
+        rcept_dt = r.get("rcept_dt", "").strip()
+        if nm not in latest or rcept_dt > latest[nm].get("rcept_dt", ""):
+            latest[nm] = r
 
     result = []
-    for nm, recs in person_records.items():
-        recs_sorted = sorted(recs, key=lambda x: x.get("rcept_dt", ""))
-
-        if as_of_date:
-            before = [r for r in recs_sorted if r.get("rcept_dt", "") <= as_of_date]
-            after  = [r for r in recs_sorted if r.get("rcept_dt", "") >  as_of_date]
-        else:
-            before = recs_sorted
-            after  = []
-
-        if before:
-            # 케이스 A: 기준일 이전 최신 공시 그대로 사용
-            ref = before[-1]
-            holdings = _to_int(ref.get("sp_stock_lmp_cnt", 0))
-            note = ref.get("rcept_dt", "-")
-        elif after:
-            # 케이스 B: 기준일 이후 첫 공시에서 역산
-            ref = after[0]
-            holdings = _to_int(ref.get("sp_stock_lmp_cnt", 0)) \
-                     - _to_int(ref.get("sp_stock_lmp_irds_cnt", 0))
-            note = f"{ref.get('rcept_dt','-')} 역산"
-        else:
-            continue
-
+    for nm, r in latest.items():
         result.append({
             "성명":       nm,
-            "직위":       ref.get("isu_exctv_ofcps", "-").strip(),
-            "등기여부":   ref.get("isu_exctv_rgist_at", "-").strip(),
-            "주요주주":   ref.get("isu_main_shrholdr", "-").strip(),
-            "보유주식수": max(holdings, 0),
-            "증감":       _to_int(ref.get("sp_stock_lmp_irds_cnt", 0)),
-            "보유비율":   _to_float(ref.get("sp_stock_lmp_rate", 0)),
-            "최근보고일": note,
+            "직위":       r.get("isu_exctv_ofcps", "-").strip(),
+            "등기여부":   r.get("isu_exctv_rgist_at", "-").strip(),
+            "주요주주":   r.get("isu_main_shrholdr", "-").strip(),
+            "보유주식수": _to_int(r.get("sp_stock_lmp_cnt", 0)),
+            "증감":       _to_int(r.get("sp_stock_lmp_irds_cnt", 0)),
+            "보유비율":   _to_float(r.get("sp_stock_lmp_rate", 0)),
+            "최근보고일": r.get("rcept_dt", "-").strip(),
         })
 
     ranked = sorted(result, key=lambda x: x["보유주식수"], reverse=True)
@@ -277,9 +259,10 @@ def main():
     today  = datetime.today()
     end_de = today.strftime("%Y%m%d")
 
-    # API가 날짜 파라미터를 무시하므로 전체 이력을 받아 build_ranking 에서 필터링
-    AS_OF = "2024-12-31"  # 이 날짜 이전 마지막 공시 기준으로 스냅샷 생성
-    period = f"2024-12-31 기준 (해당 시점까지의 최신 공시 보유수량)"
+    # 공시연도 2022~2024 범위로 필터링
+    BGN  = "2022-01-01"
+    AS_OF = "2024-12-31"
+    period = f"공시연도 {BGN} ~ {AS_OF} 중 인물별 최신 공시 기준"
 
     print(f"  전체 이력 조회 중...", end=" ", flush=True)
     try:
@@ -291,30 +274,32 @@ def main():
 
     records = all_rows
 
-    # ── 전체 인물 목록 출력 (데이터 확인용) ──────────────────
-    print("\n" + "═"*70)
-    print("  데이터에 포함된 전체 인물 목록 (rcept_dt 범위)")
-    print("═"*70)
+    # ── 2022~2024 범위 인물 목록 출력 ────────────────────────
     from collections import defaultdict
     person_dates: dict[str, list[str]] = defaultdict(list)
     for r in all_rows:
         nm = r.get("repror", "").strip()
         dt = r.get("rcept_dt", "")
-        if nm:
+        if nm and BGN <= dt <= AS_OF:
             person_dates[nm].append(dt)
+
+    print("\n" + "═"*70)
+    print(f"  공시연도 {BGN} ~ {AS_OF} 에 포함된 인물 목록")
+    print("═"*70)
     for nm in sorted(person_dates):
         dates = sorted(person_dates[nm])
         print(f"  {nm:<12} {dates[0]} ~ {dates[-1]}  ({len(dates)}건)")
+    print(f"  총 {len(person_dates)}명")
     print("═"*70 + "\n")
 
     # ── 특정 인물 검색 ──────────────────────────────────────
-    search_person(all_rows, "임창문", bgn="2022-01-01", end="2024-12-31")
+    search_person(all_rows, "임창문", bgn=BGN, end=AS_OF)
 
     if not records:
         print("조회 가능한 데이터가 없습니다.")
         sys.exit(1)
 
-    ranking = build_ranking(records, as_of_date=AS_OF)
+    ranking = build_ranking(records, bgn_date=BGN, as_of_date=AS_OF)
 
     if not ranking:
         print("랭킹 데이터를 생성할 수 없습니다.")
