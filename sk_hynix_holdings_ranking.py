@@ -225,35 +225,20 @@ def main():
     today  = datetime.today()
     end_de = today.strftime("%Y%m%d")
 
-    # 1차: 2026년 데이터 시도
+    # 2024년 데이터 조회
     records = []
     period  = ""
-    print(f"  [1차] 2026년 데이터 조회 중...", end=" ", flush=True)
+    print(f"  2024년 데이터 조회 중...", end=" ", flush=True)
     try:
-        rows = fetch_elestock(api_key, "20260101", end_de)
+        rows = fetch_elestock(api_key, "20240101", "20241231")
         if rows:
             records = rows
-            period  = f"2026년 기준 (접수일 20260101~{end_de})"
+            period  = "2024년 기준 (접수일 20240101~20241231)"
             print(f"{len(rows)}건 수신")
         else:
             print("데이터 없음")
     except Exception as e:
         print(f"실패 ({e})")
-
-    # 2차: 없으면 최근 3년 데이터에서 최신 보고 기준
-    if not records:
-        bgn_3y = today.replace(year=today.year - 3).strftime("%Y%m%d")
-        print(f"  [2차] 최근 3년 데이터 조회 중 ({bgn_3y}~{end_de})...", end=" ", flush=True)
-        try:
-            rows = fetch_elestock(api_key, bgn_3y, end_de)
-            if rows:
-                records = rows
-                period  = f"최근 3년 기준 (인물별 최신 보고일 적용, ~{end_de})"
-                print(f"{len(rows)}건 수신")
-            else:
-                print("데이터 없음")
-        except Exception as e:
-            print(f"실패 ({e})")
 
     if not records:
         print("조회 가능한 데이터가 없습니다.")
@@ -269,7 +254,7 @@ def main():
 
     out_path = os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
-        "sk_hynix_holdings_2026.xlsx",
+        "sk_hynix_holdings_2024.xlsx",
     )
     save_to_excel(ranking, period, out_path)
 
