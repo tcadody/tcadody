@@ -1,0 +1,849 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NAND CTN 터널링 시뮬레이터</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body { font-family: 'Segoe UI', sans-serif; background: #0f1117; color: #e0e0e0; min-height: 100vh; }
+h1 { font-size: 1.3rem; font-weight: 700; color: #7eb8f7; }
+h2 { font-size: 0.95rem; font-weight: 600; color: #a8c8f0; margin-bottom: 8px; }
+h3 { font-size: 0.82rem; font-weight: 600; color: #88a8d0; margin-bottom: 6px; }
+
+#app { display: grid; grid-template-columns: 300px 1fr; grid-template-rows: auto; gap: 12px; padding: 12px; max-width: 1600px; margin: 0 auto; }
+#header { grid-column: 1 / -1; background: #1a1f2e; border: 1px solid #2a3550; border-radius: 10px; padding: 14px 20px; display: flex; align-items: center; gap: 16px; }
+#header .subtitle { font-size: 0.78rem; color: #708090; }
+#header .struct-label { font-size: 0.72rem; background: #0d1520; border: 1px solid #2a4060; border-radius: 6px; padding: 4px 10px; color: #5090c0; font-family: monospace; letter-spacing: 0.5px; }
+
+#left-panel { display: flex; flex-direction: column; gap: 10px; }
+#right-panel { display: flex; flex-direction: column; gap: 10px; }
+
+.card { background: #1a1f2e; border: 1px solid #2a3550; border-radius: 10px; padding: 14px; }
+
+.field-row { display: flex; align-items: center; gap: 6px; margin-bottom: 5px; }
+.field-label { font-size: 0.73rem; color: #8090a8; flex: 1; white-space: nowrap; }
+.field-val { font-size: 0.73rem; color: #a0c0e0; width: 52px; text-align: right; font-family: monospace; }
+input[type=range] { flex: 1; height: 4px; accent-color: #5090d0; cursor: pointer; }
+input[type=number] { background: #0d1520; border: 1px solid #2a4060; border-radius: 4px; color: #a0c0e0; font-size: 0.72rem; padding: 2px 6px; width: 72px; text-align: right; font-family: monospace; }
+
+.layer-table { width: 100%; border-collapse: collapse; font-size: 0.7rem; }
+.layer-table th { color: #607080; font-weight: 500; padding: 3px 4px; border-bottom: 1px solid #2a3550; text-align: left; }
+.layer-table td { padding: 3px 4px; }
+.layer-table td input { width: 52px; background: #0d1520; border: 1px solid #1e3048; border-radius: 3px; color: #a0c0e0; font-size: 0.7rem; padding: 1px 4px; text-align: right; font-family: monospace; }
+.layer-table tr.si-ch td { color: #f0c060; }
+.layer-table tr.si-dot td { color: #60d090; }
+
+#calc-btn { width: 100%; padding: 9px; background: linear-gradient(135deg, #1e6bbf, #0d4a8c); border: 1px solid #2e7bdf; border-radius: 8px; color: #ffffff; font-size: 0.85rem; font-weight: 600; cursor: pointer; transition: all 0.2s; letter-spacing: 0.5px; }
+#calc-btn:hover { background: linear-gradient(135deg, #2e7bdf, #1d5aac); }
+
+.charts-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.chart-card { background: #1a1f2e; border: 1px solid #2a3550; border-radius: 10px; padding: 14px; }
+canvas.chart-canvas { width: 100% !important; height: 220px !important; }
+
+#band-diagram-card { grid-column: 1 / -1; }
+#band-canvas { width: 100%; height: 200px; border-radius: 6px; background: #0d1520; cursor: crosshair; }
+
+.result-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 0.75rem; margin: 3px 0; border-bottom: 1px solid #1e2838; padding-bottom: 3px; }
+.result-key { color: #7090a8; }
+.result-val { color: #70d0a0; font-family: monospace; font-weight: 600; }
+.result-val.warning { color: #f0c060; }
+
+.badge { display: inline-block; font-size: 0.65rem; padding: 1px 6px; border-radius: 4px; font-weight: 600; }
+.badge-blue { background: #1a3a5a; color: #60a8e0; }
+.badge-yellow { background: #3a2a10; color: #d0a050; }
+.badge-green { background: #0e3020; color: #50c080; }
+
+#model-select { background: #0d1520; border: 1px solid #2a4060; border-radius: 5px; color: #a0c0e0; font-size: 0.75rem; padding: 3px 6px; width: 100%; margin-bottom: 8px; }
+
+.section-divider { height: 1px; background: #2a3550; margin: 8px 0; }
+.tooltip-icon { font-size: 0.65rem; color: #406080; cursor: help; }
+
+#status-bar { grid-column: 1 / -1; background: #1a1f2e; border: 1px solid #2a3550; border-radius: 8px; padding: 8px 14px; font-size: 0.72rem; color: #60a0d0; font-family: monospace; }
+</style>
+</head>
+<body>
+<div id="app">
+
+<!-- Header -->
+<div id="header">
+  <div>
+    <h1>NAND CTN 터널링 시뮬레이터</h1>
+    <div class="subtitle">Erase 동작 시 Gate → Si.dot 전자 터널링 시뮬레이션</div>
+  </div>
+  <div class="struct-label">Gate | ALO | BOX | O | N | O | Si.channel | Oxide | Si.dot</div>
+  <div style="margin-left:auto; font-size:0.7rem; color:#506070;">T = 300 K</div>
+</div>
+
+<!-- Left panel: parameters -->
+<div id="left-panel">
+
+  <!-- Voltage / Operation -->
+  <div class="card">
+    <h2>동작 조건</h2>
+    <div class="field-row">
+      <span class="field-label">Gate 전압 V<sub>g</sub> (V)</span>
+      <input type="range" id="vg-range" min="-25" max="-5" step="0.5" value="-18">
+      <span class="field-val" id="vg-val">-18.0 V</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">온도 T (K)</span>
+      <input type="range" id="temp-range" min="200" max="450" step="10" value="300">
+      <span class="field-val" id="temp-val">300 K</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">Erase 시간 (μs)</span>
+      <input type="range" id="time-range" min="1" max="1000" step="1" value="100">
+      <span class="field-val" id="time-val">100 μs</span>
+    </div>
+    <div class="section-divider"></div>
+    <h3>에너지 손실 모델</h3>
+    <select id="model-select">
+      <option value="exp">지수 감쇠 (Exponential Decay)</option>
+      <option value="phonon" selected>광학 포논 캐스케이드 (Optical Phonon Cascade)</option>
+      <option value="both">복합 모델 (Acoustic + Optical)</option>
+    </select>
+    <div class="field-row">
+      <span class="field-label">평균자유경로 λ (nm)</span>
+      <input type="range" id="lambda-range" min="1" max="30" step="0.5" value="5">
+      <span class="field-val" id="lambda-val">5.0 nm</span>
+    </div>
+    <div class="field-row">
+      <span class="field-label">광학포논 에너지 ℏω (meV)</span>
+      <input type="range" id="phonon-range" min="30" max="90" step="1" value="63">
+      <span class="field-val" id="phonon-val">63 meV</span>
+    </div>
+  </div>
+
+  <!-- Layer stack parameters -->
+  <div class="card">
+    <h2>레이어 구조 파라미터</h2>
+    <table class="layer-table">
+      <tr><th>레이어</th><th>d (nm)</th><th>ε<sub>r</sub></th><th>φ<sub>B</sub> (eV)</th></tr>
+      <tr><td><span class="badge badge-blue">ALO</span></td>
+          <td><input type="number" id="d_alo" value="5" min="1" max="20" step="0.5"></td>
+          <td><input type="number" id="eps_alo" value="9.0" min="1" max="30" step="0.5"></td>
+          <td><input type="number" id="phi_alo" value="2.8" min="0.5" max="5" step="0.1"></td></tr>
+      <tr><td><span class="badge badge-blue">BOX</span></td>
+          <td><input type="number" id="d_box" value="3" min="1" max="15" step="0.5"></td>
+          <td><input type="number" id="eps_box" value="3.9" min="1" max="30" step="0.5"></td>
+          <td><input type="number" id="phi_box" value="3.1" min="0.5" max="5" step="0.1"></td></tr>
+      <tr><td><span class="badge badge-blue">O₁</span></td>
+          <td><input type="number" id="d_o1" value="3" min="1" max="15" step="0.5"></td>
+          <td><input type="number" id="eps_o1" value="3.9" min="1" max="30" step="0.5"></td>
+          <td><input type="number" id="phi_o1" value="3.1" min="0.5" max="5" step="0.1"></td></tr>
+      <tr><td><span class="badge badge-yellow">N</span></td>
+          <td><input type="number" id="d_n" value="7" min="1" max="20" step="0.5"></td>
+          <td><input type="number" id="eps_n" value="7.5" min="1" max="30" step="0.5"></td>
+          <td><input type="number" id="phi_n" value="2.0" min="0.5" max="5" step="0.1"></td></tr>
+      <tr><td><span class="badge badge-blue">O₂</span></td>
+          <td><input type="number" id="d_o2" value="3" min="1" max="15" step="0.5"></td>
+          <td><input type="number" id="eps_o2" value="3.9" min="1" max="30" step="0.5"></td>
+          <td><input type="number" id="phi_o2" value="3.1" min="0.5" max="5" step="0.1"></td></tr>
+      <tr class="si-ch"><td>Si.ch</td>
+          <td><input type="number" id="d_sich" value="10" min="1" max="50" step="1"></td>
+          <td><input type="number" id="eps_sich" value="11.7" min="5" max="20" step="0.5"></td>
+          <td>—</td></tr>
+      <tr><td><span class="badge badge-blue">TunOx</span></td>
+          <td><input type="number" id="d_tox" value="4" min="1" max="15" step="0.5"></td>
+          <td><input type="number" id="eps_tox" value="3.9" min="1" max="30" step="0.5"></td>
+          <td><input type="number" id="phi_tox" value="3.1" min="0.5" max="5" step="0.1"></td></tr>
+      <tr class="si-dot"><td>Si.dot</td><td colspan="3" style="color:#405060;font-size:0.65rem; padding-top:4px;">— 접지 기준 (0V) —</td></tr>
+    </table>
+    <div class="section-divider"></div>
+    <div style="font-size:0.7rem; color:#506878;">유효질량: SiO₂ 0.50m₀, Si₃N₄ 0.42m₀, Al₂O₃ 0.20m₀, Si 0.32m₀</div>
+  </div>
+
+  <!-- Calculate -->
+  <button id="calc-btn" onclick="runSimulation()">⚡ 시뮬레이션 실행</button>
+
+  <!-- Key results summary -->
+  <div class="card" id="results-summary" style="display:none">
+    <h2>주요 결과</h2>
+    <div id="result-rows"></div>
+  </div>
+
+</div>
+
+<!-- Right panel: charts -->
+<div id="right-panel">
+
+  <!-- Band diagram -->
+  <div class="card" id="band-diagram-card">
+    <h2>에너지 밴드 다이어그램</h2>
+    <canvas id="band-canvas" height="200"></canvas>
+    <div style="font-size:0.65rem; color:#405060; margin-top:4px;">← Gate &nbsp;&nbsp; ALO | BOX | O | N | O | Si.ch | TunOx | Si.dot →</div>
+  </div>
+
+  <!-- Charts grid -->
+  <div class="charts-grid">
+    <div class="chart-card">
+      <h2>J-V 특성 (터널링 전류 밀도)</h2>
+      <canvas id="jv-canvas" class="chart-canvas"></canvas>
+    </div>
+    <div class="chart-card">
+      <h2>Si.channel 내 전자 에너지 프로파일</h2>
+      <canvas id="energy-canvas" class="chart-canvas"></canvas>
+    </div>
+    <div class="chart-card">
+      <h2>Si.dot 전하 vs 시간</h2>
+      <canvas id="charge-canvas" class="chart-canvas"></canvas>
+    </div>
+    <div class="chart-card">
+      <h2>레이어별 전압 분배 & 전계</h2>
+      <canvas id="field-canvas" class="chart-canvas"></canvas>
+    </div>
+  </div>
+
+</div>
+
+<!-- Status bar -->
+<div id="status-bar" id="status-bar">준비됨. 파라미터 조정 후 [시뮬레이션 실행]을 클릭하세요.</div>
+
+</div><!-- #app -->
+
+<script>
+// ─── Physical constants ───────────────────────────────────────────
+const q    = 1.602e-19;   // C
+const hbar = 1.055e-34;   // J·s
+const m0   = 9.109e-31;   // kg
+const eps0 = 8.854e-12;   // F/m
+const kB   = 1.381e-23;   // J/K
+const h    = 6.626e-34;   // J·s
+const eV   = 1.602e-19;   // J per eV
+
+// Effective masses (units of m0)
+const MSTAR = { alo:0.20, sio2:0.50, si3n4:0.42, si:0.32 };
+
+// ─── Slider binding ───────────────────────────────────────────────
+function bindSlider(sliderId, valId, fmt) {
+  const sl = document.getElementById(sliderId);
+  const vl = document.getElementById(valId);
+  const update = () => vl.textContent = fmt(parseFloat(sl.value));
+  sl.addEventListener('input', update);
+  update();
+}
+bindSlider('vg-range',     'vg-val',     v => v.toFixed(1)+' V');
+bindSlider('temp-range',   'temp-val',   v => v.toFixed(0)+' K');
+bindSlider('time-range',   'time-val',   v => v.toFixed(0)+' μs');
+bindSlider('lambda-range', 'lambda-val', v => v.toFixed(1)+' nm');
+bindSlider('phonon-range', 'phonon-val', v => v.toFixed(0)+' meV');
+
+// ─── Read params ─────────────────────────────────────────────────
+function getParams() {
+  const num = id => parseFloat(document.getElementById(id).value);
+  return {
+    Vg:      parseFloat(document.getElementById('vg-range').value),
+    T:       parseFloat(document.getElementById('temp-range').value),
+    t_erase: parseFloat(document.getElementById('time-range').value) * 1e-6,
+    lambda:  parseFloat(document.getElementById('lambda-range').value) * 1e-9,
+    E_phonon:parseFloat(document.getElementById('phonon-range').value) * 1e-3 * eV,
+    elossModel: document.getElementById('model-select').value,
+    layers: [
+      { name:'ALO',   d:num('d_alo')*1e-9,  eps:num('eps_alo'),  phi:num('phi_alo'),  mstar:MSTAR.alo,   type:'ins' },
+      { name:'BOX',   d:num('d_box')*1e-9,  eps:num('eps_box'),  phi:num('phi_box'),  mstar:MSTAR.sio2,  type:'ins' },
+      { name:'O₁',   d:num('d_o1')*1e-9,   eps:num('eps_o1'),   phi:num('phi_o1'),   mstar:MSTAR.sio2,  type:'ins' },
+      { name:'N',     d:num('d_n')*1e-9,    eps:num('eps_n'),    phi:num('phi_n'),    mstar:MSTAR.si3n4, type:'trap'},
+      { name:'O₂',   d:num('d_o2')*1e-9,   eps:num('eps_o2'),   phi:num('phi_o2'),   mstar:MSTAR.sio2,  type:'ins' },
+      { name:'Si.ch', d:num('d_sich')*1e-9, eps:num('eps_sich'), phi:0,               mstar:MSTAR.si,    type:'semi'},
+      { name:'TunOx', d:num('d_tox')*1e-9,  eps:num('eps_tox'),  phi:num('phi_tox'),  mstar:MSTAR.sio2,  type:'ins' },
+    ]
+  };
+}
+
+// ─── Voltage distribution (capacitance divider) ────────────────────
+function voltageDistribution(layers, Vtotal) {
+  // Each layer: C_i = eps_i*eps0/d_i  → 1/C_eq = Σ(d_i/(eps_i*eps0))
+  // V_i/V_total = (d_i/eps_i) / Σ(d_j/eps_j)
+  let sumDE = 0;
+  for (const L of layers) sumDE += L.d / L.eps;
+  return layers.map(L => ({
+    ...L,
+    V: Vtotal * (L.d / L.eps) / sumDE,
+    E_field: Vtotal * (1 / L.eps) / sumDE  // V/m; E = V/d = Vtotal*(1/eps)/Σ(d/eps)
+  }));
+}
+
+// ─── Fowler-Nordheim / WKB tunneling current density ──────────────
+// Returns J in A/m²
+function fnCurrent(E_V_per_m, phi_B_eV, mstar_ratio) {
+  if (E_V_per_m <= 0) return 1e-100;
+  const phi = phi_B_eV * eV;          // J
+  const meff = mstar_ratio * m0;       // kg
+
+  // FN prefactor A (A/V²) : A = q³/(8π·h·φ_B) × (m₀/m*)
+  const A = (q * q * q) / (8 * Math.PI * h * phi) * (m0 / meff);
+
+  // FN exponent B (V/m): B = (4/3)·√(2m*)·φ_B^(3/2)/(q·ℏ)
+  const B = (4 / 3) * Math.sqrt(2 * meff) * Math.pow(phi, 1.5) / (q * hbar);
+
+  return A * E_V_per_m * E_V_per_m * Math.exp(-B / E_V_per_m);
+}
+
+// ─── Direct tunneling (rectangular barrier, thin oxide) ───────────
+// Returns dimensionless transmission T
+function directTunneling(d_m, phi_B_eV, E_kin_eV, mstar_ratio) {
+  const phi = (phi_B_eV - E_kin_eV) * eV;
+  if (phi <= 0) return 1.0;
+  const meff = mstar_ratio * m0;
+  const kappa = Math.sqrt(2 * meff * phi) / hbar;
+  return Math.exp(-2 * kappa * d_m);
+}
+
+// ─── Effective FN including kinetic energy of incoming electron ────
+// phi_eff = phi_B - E_kin (reduced barrier)
+function fnEffective(E_V_per_m, phi_B_eV, E_kin_eV, mstar_ratio) {
+  const phi_eff = phi_B_eV - E_kin_eV;
+  if (phi_eff <= 0.01) {
+    // Thermionic emission — treat as fully transparent
+    return fnCurrent(E_V_per_m, 0.01, mstar_ratio) * 1e3; // very large
+  }
+  return fnCurrent(E_V_per_m, phi_eff, mstar_ratio);
+}
+
+// ─── Energy loss in Si.channel ────────────────────────────────────
+function energyLoss(E_in_eV, d_ch, lambda, E_phonon_J, T_K, model) {
+  const kT = kB * T_K / eV;  // eV
+  const E_ph = E_phonon_J / eV; // eV (optical phonon energy)
+
+  if (model === 'exp') {
+    // Simple exponential: E_out = E_in·exp(-d/λ) + kT
+    const E_out = E_in_eV * Math.exp(-d_ch / lambda) + kT;
+    return { E_out, n_collisions: d_ch / lambda, dE: E_in_eV - E_out };
+  }
+
+  if (model === 'phonon') {
+    // Optical phonon cascade: each collision emits one phonon (ℏω)
+    // n_collisions = floor(d_ch / λ_op) but also bounded by E_in/E_phonon
+    const n_max_energy = Math.floor(E_in_eV / E_ph);
+    const n_path = Math.floor(d_ch / lambda);
+    const n_col = Math.min(n_max_energy, n_path);
+    const E_out = Math.max(E_in_eV - n_col * E_ph, kT);
+    return { E_out, n_collisions: n_col, dE: E_in_eV - E_out };
+  }
+
+  if (model === 'both') {
+    // Acoustic + optical phonons
+    // Acoustic: small energy loss per collision, λ_ac ≈ 30nm
+    const lambda_ac = 30e-9;
+    const dE_ac_per_coll = kT * 0.5; // small
+    const n_ac = Math.floor(d_ch / lambda_ac);
+    let E_curr = E_in_eV - n_ac * dE_ac_per_coll;
+
+    // Optical: only if E_curr > E_ph
+    const n_op_max = Math.floor(E_curr / E_ph);
+    const n_op = Math.min(n_op_max, Math.floor(d_ch / lambda));
+    E_curr = Math.max(E_curr - n_op * E_ph, kT);
+    return { E_out: E_curr, n_collisions: n_ac + n_op, dE: E_in_eV - E_curr };
+  }
+
+  return { E_out: E_in_eV, n_collisions: 0, dE: 0 };
+}
+
+// ─── Energy profile across Si.channel (for plotting) ──────────────
+function channelEnergyProfile(E_in_eV, d_ch, lambda, E_phonon_J, T_K, model, N=50) {
+  const xs = [], es = [];
+  const kT = kB * T_K / eV;
+  const E_ph = E_phonon_J / eV;
+
+  for (let i = 0; i <= N; i++) {
+    const x = (i / N) * d_ch;
+    xs.push((x * 1e9).toFixed(2));
+
+    let E;
+    if (model === 'exp') {
+      E = E_in_eV * Math.exp(-x / lambda) + kT;
+    } else if (model === 'phonon') {
+      const n = Math.min(Math.floor(x / lambda), Math.floor(E_in_eV / E_ph));
+      E = Math.max(E_in_eV - n * E_ph, kT);
+    } else {
+      const n_ac = Math.floor(x / 30e-9);
+      let Ec = E_in_eV - n_ac * kT * 0.5;
+      const n_op = Math.min(Math.floor(x / lambda), Math.floor(Ec / E_ph));
+      E = Math.max(Ec - n_op * E_ph, kT);
+    }
+    es.push(E);
+  }
+  return { xs, es };
+}
+
+// ─── Full J-V sweep ───────────────────────────────────────────────
+function computeJV(p) {
+  const Vrange = [];
+  const Jvals = [];
+  for (let Vg = -5; Vg >= -25; Vg -= 0.5) {
+    const result = computeAtVoltage(p, Vg);
+    Vrange.push(Vg);
+    Jvals.push(result.J_dot);
+  }
+  return { Vrange, Jvals };
+}
+
+// ─── Core tunneling calculation at one voltage ────────────────────
+function computeAtVoltage(p, Vg) {
+  // Vg < 0 for erase: gate is negative, Si.dot = 0V
+  // Total voltage drop across stack = |Vg|
+  const Vtotal = Math.abs(Vg);  // electrons go gate→Si.dot
+  const T_K = p.T;
+
+  const lv = voltageDistribution(p.layers, Vtotal);
+
+  // ── Step 1: Tunneling through blocking stack (ALO+BOX+O₁+N+O₂) ─
+  // Model: sequential FN tunneling; current is min of each layer's FN
+  // (current continuity: J must be equal in steady state → use series model)
+  // Resistance in series: use min current approach (most restrictive barrier)
+
+  const insLayers = lv.filter(L => L.type === 'ins' || L.type === 'trap');
+  const semiLayer = lv.find(L => L.type === 'semi');
+  const tunOxLayer = lv.find(L => L.name === 'TunOx');
+
+  // Blocking oxide stack current (gate-side, layers 0-4)
+  const blockingLayers = lv.slice(0, 5); // ALO,BOX,O1,N,O2
+  let J_block_arr = blockingLayers.map(L => {
+    if (L.E_field < 1e5) return 1e-40;
+    return fnCurrent(L.E_field, L.phi, L.mstar);
+  });
+  // Most restrictive layer limits the current
+  const J_block = Math.min(...J_block_arr.filter(j => j > 0));
+
+  // ── Step 2: Energy of electron entering Si.channel ──────────────
+  // After tunneling through blocking stack, electron lands at Si.channel
+  // with kinetic energy = voltage drop up to Si.channel (electrostatic acceleration)
+  // E_kin_in = q × (sum of V drops in blocking layers) [in eV]
+  const V_block = blockingLayers.reduce((s, L) => s + L.V, 0);
+  const E_kin_in = V_block; // eV (since q × V in eV = V numerically)
+
+  // ── Step 3: Energy loss in Si.channel ──────────────────────────
+  const { E_out, n_collisions, dE } =
+    energyLoss(E_kin_in, semiLayer.d, p.lambda, p.E_phonon, T_K, p.elossModel);
+
+  // ── Step 4: Tunneling through tunnel oxide with remaining energy ─
+  // Effective barrier = phi_TunOx - E_kin_remaining
+  const E_field_tox = tunOxLayer.E_field;
+  let J_tox;
+  if (E_out >= tunOxLayer.phi) {
+    // Electron has enough energy — near-thermionic, treat as FN with very low barrier
+    J_tox = fnCurrent(E_field_tox, 0.05, tunOxLayer.mstar);
+  } else {
+    J_tox = fnEffective(E_field_tox, tunOxLayer.phi, E_out, tunOxLayer.mstar);
+  }
+
+  // ── Step 5: Net current to Si.dot ──────────────────────────────
+  // Series: minimum of (J_block, J_tox)
+  const J_dot = Math.min(J_block, J_tox);
+
+  // Electron count rate per unit area:  dN/dt = J/q  (#/m²/s)
+  const dNdt = J_dot / q;
+
+  return { lv, J_block, J_tox, J_dot, E_kin_in, E_out, n_collisions, dE,
+           blockingLayers, semiLayer, tunOxLayer, V_block, Vtotal };
+}
+
+// ─── Draw band diagram ────────────────────────────────────────────
+function drawBandDiagram(ctx, lv, Vg, T_K) {
+  const W = ctx.canvas.width, H = ctx.canvas.height;
+  ctx.clearRect(0, 0, W, H);
+
+  // Background
+  ctx.fillStyle = '#0d1520';
+  ctx.fillRect(0, 0, W, H);
+
+  const pad = { l:50, r:30, t:20, b:25 };
+  const plotW = W - pad.l - pad.r;
+  const plotH = H - pad.t - pad.b;
+
+  // Energy scale: vacuum level = max barrier height, min = below Si.dot CB
+  const Vtotal = Math.abs(Vg);
+  const maxE = 5;   // eV above Si.dot CB
+  const minE = -1;  // eV below
+  const Erange = maxE - minE;
+
+  function xPx(frac) { return pad.l + frac * plotW; }
+  function yPx(E_eV) { return pad.t + plotH * (1 - (E_eV - minE) / Erange); }
+
+  // Draw grid
+  ctx.strokeStyle = '#1e2838'; ctx.lineWidth = 1;
+  for (let E = -1; E <= 5; E += 1) {
+    ctx.beginPath(); ctx.moveTo(pad.l, yPx(E)); ctx.lineTo(W - pad.r, yPx(E)); ctx.stroke();
+  }
+
+  // Compute x positions of each layer boundary
+  let totalD = lv.reduce((s, L) => s + L.d, 0);
+  let xFracs = [0];
+  let cum = 0;
+  for (const L of lv) { cum += L.d; xFracs.push(cum / totalD); }
+
+  // Layer colors
+  const layerColors = {
+    'ALO':   { fill:'rgba(100,120,220,0.12)', border:'#4060aa' },
+    'BOX':   { fill:'rgba(80,140,200,0.12)',  border:'#3070a0' },
+    'O₁':  { fill:'rgba(80,140,200,0.12)',  border:'#3070a0' },
+    'N':     { fill:'rgba(220,180,80,0.18)', border:'#a08020' },
+    'O₂':  { fill:'rgba(80,140,200,0.12)',  border:'#3070a0' },
+    'Si.ch': { fill:'rgba(60,200,100,0.10)', border:'#30a050' },
+    'TunOx': { fill:'rgba(80,140,200,0.12)', border:'#3070a0' },
+  };
+
+  // Build energy band profile across the structure
+  // Conduction band: starts at phi_B (barrier height) at gate contact,
+  // then linearly drops by V_drop in each layer
+  // Reference: Si.dot CB = 0 eV, gate Fermi level = Vg eV (negative)
+
+  // Gate: E_F = Vg (since Si.dot at 0)
+  // As electrons travel gate→Si.dot, their potential energy drops by q*|Vg|
+
+  // Conduction band in each layer at x=0 of that layer:
+  // Gate metal E_F at Vg; ALO CB = E_F + phi_ALO (metal-oxide barrier)
+  // Then CB drops linearly through each layer
+
+  let bandPoints = []; // {x_frac, CB_eV}
+
+  // Gate side: CB starts at (Vg + phi_ALO)
+  // But in our reference frame (Si.dot CB = 0, Si.dot E_F ≈ 0):
+  // Electron in gate has E_F = Vg (= -|Vg|)
+  // ALO CB at gate interface = Vg + phi_ALO[eV above gate E_F]
+  // But we need to account for band bending due to field
+
+  // Simple approach: trace conduction band from gate to Si.dot
+  // At gate/ALO interface: CB_ALO = phi_ALO (barrier above gate E_F)
+  //   Since gate E_F = Vg, CB_ALO_at_gate = Vg + phi_ALO
+  // CB drops by V_drop across each layer
+
+  let x0 = 0;
+  let CB_current = Vg + lv[0].phi; // eV; gate E_F + first barrier height
+
+  for (let i = 0; i < lv.length; i++) {
+    const L = lv[i];
+    const x1 = xFracs[i], x2 = xFracs[i+1];
+
+    // Draw layer background
+    const col = layerColors[L.name] || { fill:'rgba(80,80,80,0.1)', border:'#444' };
+    ctx.fillStyle = col.fill;
+    ctx.fillRect(xPx(x1), pad.t, (x2-x1)*plotW, plotH);
+
+    // Layer label
+    ctx.fillStyle = '#607090';
+    ctx.font = '9px monospace';
+    ctx.textAlign = 'center';
+    ctx.fillText(L.name, xPx((x1+x2)/2), H - 8);
+
+    // Conduction band: CB at start and end of layer
+    const CB_start = CB_current;
+    const CB_end = CB_current - L.V; // drops by V_drop in direction of electron travel
+    CB_current = CB_end;
+
+    // Draw CB (solid line for insulators, dashed for semiconductor)
+    ctx.beginPath();
+    ctx.strokeStyle = (L.type === 'semi') ? '#30c060' : '#4488cc';
+    ctx.lineWidth = 1.8;
+    if (L.type === 'semi') {
+      ctx.setLineDash([3, 3]);
+    } else {
+      ctx.setLineDash([]);
+    }
+    ctx.moveTo(xPx(x1), yPx(CB_start));
+    ctx.lineTo(xPx(x2), yPx(CB_end));
+    ctx.stroke();
+    ctx.setLineDash([]);
+
+    // For semiconductors, also draw VB (Si: Eg = 1.12 eV)
+    if (L.type === 'semi') {
+      const Eg_Si = 1.12;
+      ctx.beginPath();
+      ctx.strokeStyle = '#20804a';
+      ctx.lineWidth = 1.4;
+      ctx.setLineDash([3,3]);
+      ctx.moveTo(xPx(x1), yPx(CB_start - Eg_Si));
+      ctx.lineTo(xPx(x2), yPx(CB_end - Eg_Si));
+      ctx.stroke();
+      ctx.setLineDash([]);
+    }
+
+    bandPoints.push({ x: x1, CB: CB_start });
+  }
+  bandPoints.push({ x: 1, CB: 0 }); // Si.dot CB = 0
+
+  // Draw valence band for insulators (CB - Eg)
+  const Eg_map = { 'ALO':8.8, 'BOX':9.0, 'O₁':9.0, 'N':5.0, 'O₂':9.0, 'TunOx':9.0 };
+
+  // Gate Fermi level
+  ctx.strokeStyle = '#3060a0'; ctx.lineWidth = 1.5; ctx.setLineDash([4,3]);
+  ctx.beginPath();
+  ctx.moveTo(pad.l - 30, yPx(Vg)); ctx.lineTo(xPx(xFracs[1]), yPx(Vg));
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#3060a0'; ctx.font = '9px sans-serif'; ctx.textAlign = 'right';
+  ctx.fillText('E_F(gate)', pad.l - 2, yPx(Vg) + 3);
+
+  // Si.dot Fermi level (≈ 0)
+  ctx.strokeStyle = '#30a060'; ctx.lineWidth = 1.5; ctx.setLineDash([4,3]);
+  ctx.beginPath();
+  ctx.moveTo(xPx(1), yPx(0)); ctx.lineTo(W - pad.r + 20, yPx(0));
+  ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle = '#30a060'; ctx.font = '9px sans-serif'; ctx.textAlign = 'left';
+  ctx.fillText('E_F(dot)', W - pad.r + 2, yPx(0) + 3);
+
+  // Electron flow arrow
+  const arrowY = yPx(Vg + 0.3);
+  if (arrowY > pad.t && arrowY < H - pad.b) {
+    ctx.strokeStyle = '#80c0ff'; ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(pad.l, arrowY); ctx.lineTo(W - pad.r - 10, arrowY);
+    ctx.stroke();
+    ctx.fillStyle = '#80c0ff';
+    ctx.beginPath();
+    ctx.moveTo(W - pad.r - 5, arrowY);
+    ctx.lineTo(W - pad.r - 12, arrowY - 4);
+    ctx.lineTo(W - pad.r - 12, arrowY + 4);
+    ctx.fill();
+    ctx.font = '9px sans-serif'; ctx.textAlign = 'center'; ctx.fillStyle = '#80c0ff';
+    ctx.fillText('e⁻', W/2, arrowY - 5);
+  }
+
+  // Y axis labels
+  ctx.fillStyle = '#506878'; ctx.font = '9px monospace'; ctx.textAlign = 'right';
+  for (let E = 0; E <= 4; E += 1) {
+    if (yPx(E) > pad.t && yPx(E) < H - pad.b) {
+      ctx.fillText(E + 'eV', pad.l - 4, yPx(E) + 3);
+    }
+  }
+  ctx.fillStyle = '#506878'; ctx.save(); ctx.translate(12, H/2); ctx.rotate(-Math.PI/2);
+  ctx.textAlign = 'center'; ctx.fillText('Energy (eV)', 0, 0); ctx.restore();
+}
+
+// ─── Charts ───────────────────────────────────────────────────────
+let charts = {};
+
+function mkChart(id, type, data, options) {
+  const canvas = document.getElementById(id);
+  if (charts[id]) charts[id].destroy();
+  charts[id] = new Chart(canvas, { type, data, options });
+}
+
+const darkTheme = {
+  color: '#8090a8',
+  grid: { color: '#1e2838' },
+  ticks: { color: '#607080' },
+};
+
+function plotJV(p) {
+  const { Vrange, Jvals } = computeJV(p);
+  const J_log = Jvals.map(j => j > 0 ? Math.log10(j) : -40);
+
+  mkChart('jv-canvas', 'line', {
+    labels: Vrange.map(v => v.toFixed(1)),
+    datasets: [{
+      label: 'log₁₀(J) [A/m²]',
+      data: J_log,
+      borderColor: '#4488dd',
+      backgroundColor: 'rgba(40,80,180,0.15)',
+      borderWidth: 2,
+      pointRadius: 0,
+      fill: true,
+    }]
+  }, {
+    responsive: true,
+    animation: false,
+    plugins: { legend: { labels: { color: '#8090a8', font: {size:10} } } },
+    scales: {
+      x: { title: { display:true, text:'Gate Voltage (V)', color:'#607080', font:{size:10} }, grid: darkTheme.grid, ticks: darkTheme.ticks },
+      y: { title: { display:true, text:'log₁₀J (A/m²)', color:'#607080', font:{size:10} }, grid: darkTheme.grid, ticks: darkTheme.ticks }
+    }
+  });
+}
+
+function plotEnergyProfile(p, semiLayer, E_kin_in) {
+  const { xs, es } = channelEnergyProfile(
+    E_kin_in, semiLayer.d, p.lambda, p.E_phonon, p.T, p.elossModel);
+  const kT = kB * p.T / eV;
+
+  mkChart('energy-canvas', 'line', {
+    labels: xs,
+    datasets: [
+      {
+        label: 'E_kin (eV)',
+        data: es,
+        borderColor: '#f0a030',
+        backgroundColor: 'rgba(200,120,20,0.15)',
+        borderWidth: 2,
+        pointRadius: 0,
+        fill: true,
+      },
+      {
+        label: 'kT thermal floor',
+        data: xs.map(() => kT),
+        borderColor: '#406050',
+        borderWidth: 1,
+        borderDash: [4,3],
+        pointRadius: 0,
+        fill: false,
+      }
+    ]
+  }, {
+    responsive: true,
+    animation: false,
+    plugins: { legend: { labels: { color: '#8090a8', font:{size:10} } } },
+    scales: {
+      x: { title: { display:true, text:'Si.channel 위치 (nm)', color:'#607080', font:{size:10} }, grid: darkTheme.grid, ticks: darkTheme.ticks },
+      y: { title: { display:true, text:'전자 에너지 (eV)', color:'#607080', font:{size:10} }, grid: darkTheme.grid, ticks: darkTheme.ticks }
+    }
+  });
+}
+
+function plotCharge(p, J_dot) {
+  const times = [];
+  const Ns = [];
+  const A = 1e-14; // typical Si.dot area: 10nm × 10nm = 100 nm² = 1e-16 m²... use 10nm² = 1e-16? let's say 1e-14 = 100nm × 100nm
+  for (let i = 0; i <= 50; i++) {
+    const t = (i / 50) * p.t_erase;
+    times.push((t * 1e6).toFixed(2));
+    Ns.push(J_dot * A * t / q);
+  }
+
+  mkChart('charge-canvas', 'line', {
+    labels: times,
+    datasets: [{
+      label: 'Si.dot 유입 전자 수 (A=100×100nm²)',
+      data: Ns,
+      borderColor: '#50d090',
+      backgroundColor: 'rgba(30,160,80,0.15)',
+      borderWidth: 2,
+      pointRadius: 0,
+      fill: true,
+    }]
+  }, {
+    responsive: true,
+    animation: false,
+    plugins: { legend: { labels: { color: '#8090a8', font:{size:10} } } },
+    scales: {
+      x: { title: { display:true, text:'시간 (μs)', color:'#607080', font:{size:10} }, grid: darkTheme.grid, ticks: darkTheme.ticks },
+      y: { title: { display:true, text:'전자 수 (#)', color:'#607080', font:{size:10} }, grid: darkTheme.grid, ticks: darkTheme.ticks }
+    }
+  });
+}
+
+function plotFields(lv) {
+  const labels = lv.map(L => L.name);
+  const volts  = lv.map(L => L.V.toFixed(3));
+  const fields = lv.map(L => (L.E_field / 1e6).toFixed(2)); // MV/m
+
+  mkChart('field-canvas', 'bar', {
+    labels,
+    datasets: [
+      {
+        label: '전압 강하 (V)',
+        data: volts,
+        backgroundColor: 'rgba(50,100,200,0.5)',
+        borderColor: '#3060c0',
+        borderWidth: 1,
+        yAxisID: 'y',
+      },
+      {
+        label: '전계 (MV/m)',
+        data: fields,
+        backgroundColor: 'rgba(200,100,50,0.5)',
+        borderColor: '#c06030',
+        borderWidth: 1,
+        yAxisID: 'y1',
+        type: 'line',
+      }
+    ]
+  }, {
+    responsive: true,
+    animation: false,
+    plugins: { legend: { labels: { color: '#8090a8', font:{size:10} } } },
+    scales: {
+      x: { grid: darkTheme.grid, ticks: darkTheme.ticks },
+      y:  { title: { display:true, text:'전압 (V)',   color:'#607080', font:{size:10} }, grid: darkTheme.grid, ticks: darkTheme.ticks, position:'left' },
+      y1: { title: { display:true, text:'E (MV/m)', color:'#607080', font:{size:10} }, grid: { display:false }, ticks: darkTheme.ticks, position:'right' }
+    }
+  });
+}
+
+// ─── Format current ───────────────────────────────────────────────
+function fmtJ(J) {
+  if (J < 1e-40) return '~0 (below FN threshold)';
+  const exp = Math.floor(Math.log10(J));
+  const man = (J / Math.pow(10, exp)).toFixed(2);
+  return `${man}×10<sup>${exp}</sup> A/m²`;
+}
+
+function fmtSci(x) {
+  if (x <= 0) return '0';
+  const exp = Math.floor(Math.log10(x));
+  const man = (x / Math.pow(10, exp)).toFixed(2);
+  return `${man}×10<sup>${exp}</sup>`;
+}
+
+// ─── Main simulation entry point ──────────────────────────────────
+function runSimulation() {
+  const p = getParams();
+  const status = document.getElementById('status-bar');
+  status.textContent = '계산 중...';
+
+  setTimeout(() => {
+    try {
+      const r = computeAtVoltage(p, p.Vg);
+
+      // Update band diagram
+      const canvas = document.getElementById('band-canvas');
+      canvas.width = canvas.offsetWidth || 900;
+      canvas.height = 200;
+      const ctx = canvas.getContext('2d');
+      drawBandDiagram(ctx, r.lv, p.Vg, p.T);
+
+      // Update charts
+      plotJV(p);
+      plotEnergyProfile(p, r.semiLayer, r.E_kin_in);
+      plotCharge(p, r.J_dot);
+      plotFields(r.lv);
+
+      // Summary results
+      const A_dot = 1e-14; // 100×100 nm²
+      const N_total = r.J_dot * A_dot * p.t_erase / q;
+      const I_dot = r.J_dot * A_dot;
+
+      const rows = [
+        ['Gate 전압', `${p.Vg.toFixed(1)} V`],
+        ['총 전압강하 (차단 스택)', `${r.V_block.toFixed(2)} V`],
+        ['차단 스택 J<sub>block</sub>', fmtJ(r.J_block)],
+        ['TunOx J<sub>tox</sub>', fmtJ(r.J_tox)],
+        ['<b>Si.dot 전류밀도 J</b>', fmtJ(r.J_dot)],
+        ['Si.dot 전류 (100×100nm²)', `${fmtSci(I_dot)} A`],
+        ['Si.channel 입구 E<sub>kin</sub>', `${r.E_kin_in.toFixed(3)} eV`],
+        ['Si.channel 출구 E<sub>kin</sub>', `${r.E_out.toFixed(3)} eV`],
+        ['에너지 손실 ΔE', `${r.dE.toFixed(3)} eV`],
+        ['포논 충돌 횟수', `${r.n_collisions}`],
+        [`Erase 시 유입 전자 수 (${(p.t_erase*1e6).toFixed(0)}μs)`, `${fmtSci(N_total)} 개`],
+      ];
+
+      const rDiv = document.getElementById('result-rows');
+      rDiv.innerHTML = rows.map(([k,v]) =>
+        `<div class="result-row"><span class="result-key">${k}</span><span class="result-val">${v}</span></div>`
+      ).join('');
+      document.getElementById('results-summary').style.display = 'block';
+
+      status.textContent = `완료 — J_dot = ${r.J_dot.toExponential(2)} A/m²  |  V_gate = ${p.Vg} V  |  ΔE = ${r.dE.toFixed(3)} eV (${p.elossModel} 모델)`;
+    } catch(e) {
+      status.textContent = '오류: ' + e.message;
+      console.error(e);
+    }
+  }, 10);
+}
+
+// Run on load with defaults
+window.addEventListener('load', () => setTimeout(runSimulation, 200));
+window.addEventListener('resize', () => {
+  // Redraw band diagram on resize
+  const p = getParams();
+  const r = computeAtVoltage(p, p.Vg);
+  const canvas = document.getElementById('band-canvas');
+  canvas.width = canvas.offsetWidth || 900;
+  const ctx = canvas.getContext('2d');
+  drawBandDiagram(ctx, r.lv, p.Vg, p.T);
+});
+</script>
+</body>
+</html>
