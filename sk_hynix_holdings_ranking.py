@@ -291,8 +291,24 @@ def main():
 
     records = all_rows
 
-    # 특정 인물 검색 (이름 일부만 입력 가능)
-    search_person(all_rows, "임창문", bgn="2023-01-01", end="2024-12-31")
+    # ── 전체 인물 목록 출력 (데이터 확인용) ──────────────────
+    print("\n" + "═"*70)
+    print("  데이터에 포함된 전체 인물 목록 (rcept_dt 범위)")
+    print("═"*70)
+    from collections import defaultdict
+    person_dates: dict[str, list[str]] = defaultdict(list)
+    for r in all_rows:
+        nm = r.get("repror", "").strip()
+        dt = r.get("rcept_dt", "")
+        if nm:
+            person_dates[nm].append(dt)
+    for nm in sorted(person_dates):
+        dates = sorted(person_dates[nm])
+        print(f"  {nm:<12} {dates[0]} ~ {dates[-1]}  ({len(dates)}건)")
+    print("═"*70 + "\n")
+
+    # ── 특정 인물 검색 ──────────────────────────────────────
+    search_person(all_rows, "임창문", bgn="2022-01-01", end="2024-12-31")
 
     if not records:
         print("조회 가능한 데이터가 없습니다.")
