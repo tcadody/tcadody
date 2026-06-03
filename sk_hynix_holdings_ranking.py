@@ -230,18 +230,29 @@ def main():
     today  = datetime.today()
     end_de = today.strftime("%Y%m%d")
 
-    # 2024년 데이터 조회
+    # 2024 사업보고서는 보고기준일 2024-12-31 / 접수일 2025-03~04월
+    # → 2025-01-01 ~ 2025-06-30 범위로 조회
     records = []
     period  = ""
-    print(f"  2024년 데이터 조회 중...", end=" ", flush=True)
+    print(f"  2024년 사업보고서 조회 중 (접수일 20250101~20250630)...", end=" ", flush=True)
     try:
-        rows = fetch_elestock(api_key, "20240101", "20241231")
+        rows = fetch_elestock(api_key, "20250101", "20250630")
         if rows:
             records = rows
-            period  = "2024년 기준 (접수일 20240101~20241231)"
+            period  = "2024년 사업보고서 기준 (보고기준일 2024-12-31)"
             print(f"{len(rows)}건 수신")
+            # 진단: 첫 레코드 전체 필드 출력 (보고기준일 필드 확인용)
+            print("\n[진단] 첫 번째 레코드:")
+            for k, v in records[0].items():
+                print(f"  {k}: {v}")
+            print()
         else:
-            print("데이터 없음")
+            print("데이터 없음 → 2024년 전체 접수분으로 재시도")
+            rows2 = fetch_elestock(api_key, "20240101", "20241231")
+            if rows2:
+                records = rows2
+                period  = "2024년 기준 (접수일 20240101~20241231)"
+                print(f"  {len(rows2)}건 수신")
     except Exception as e:
         print(f"실패 ({e})")
 
@@ -249,7 +260,7 @@ def main():
         print("조회 가능한 데이터가 없습니다.")
         sys.exit(1)
 
-    ranking = build_ranking(records, year="2024")
+    ranking = build_ranking(records)
 
     if not ranking:
         print("랭킹 데이터를 생성할 수 없습니다.")
