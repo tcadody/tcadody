@@ -1,0 +1,758 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>NAND GAA CTN Erase Simulator</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',sans-serif;background:#0b0f1a;color:#d8e0ec;min-height:100vh}
+#app{display:grid;grid-template-columns:290px 1fr;grid-template-rows:auto 1fr;gap:10px;padding:10px;max-width:1700px;margin:0 auto}
+#hdr{grid-column:1/-1;background:#131824;border:1px solid #1e2d45;border-radius:10px;padding:12px 18px;display:flex;align-items:center;gap:14px;flex-wrap:wrap}
+h1{font-size:1.1rem;font-weight:700;color:#6eb4f7}
+.sub{font-size:.72rem;color:#5a7090}
+.stack-badge{font-size:.67rem;font-family:monospace;background:#0a1520;border:1px solid #1e3a55;border-radius:5px;padding:3px 10px;color:#4a90c8;letter-spacing:.5px}
+.bias-badge{font-size:.72rem;background:#0f1f10;border:1px solid #1e4020;border-radius:5px;padding:3px 10px;color:#50c060}
+#left{display:flex;flex-direction:column;gap:8px;overflow-y:auto;max-height:calc(100vh - 80px)}
+#right{display:flex;flex-direction:column;gap:8px}
+.card{background:#131824;border:1px solid #1e2d45;border-radius:9px;padding:12px}
+h2{font-size:.85rem;font-weight:600;color:#88b0d8;margin-bottom:8px}
+h3{font-size:.75rem;font-weight:600;color:#6080a0;margin-bottom:5px}
+.row{display:flex;align-items:center;gap:6px;margin-bottom:4px}
+.lbl{font-size:.7rem;color:#6a8098;flex:1;white-space:nowrap}
+.vval{font-size:.7rem;color:#90b8d8;width:58px;text-align:right;font-family:monospace}
+input[type=range]{flex:1;height:4px;accent-color:#4a90d0;cursor:pointer}
+input[type=number]{background:#0a1018;border:1px solid #1e3248;border-radius:3px;color:#90b8d8;font-size:.7rem;padding:2px 5px;width:62px;text-align:right;font-family:monospace}
+.tbl{width:100%;border-collapse:collapse;font-size:.68rem}
+.tbl th{color:#506070;font-weight:500;padding:2px 4px;border-bottom:1px solid #1e2d45;text-align:left}
+.tbl td{padding:2px 3px}
+.tbl td input{width:54px;background:#0a1018;border:1px solid #162030;border-radius:3px;color:#90b8d8;font-size:.68rem;padding:1px 4px;text-align:right;font-family:monospace}
+.divider{height:1px;background:#1a2535;margin:7px 0}
+#run-btn{width:100%;padding:9px;background:linear-gradient(135deg,#1a60b0,#0d4080);border:1px solid #2a70d0;border-radius:8px;color:#fff;font-size:.85rem;font-weight:600;cursor:pointer;transition:.2s;letter-spacing:.4px}
+#run-btn:hover{background:linear-gradient(135deg,#2a70c0,#1a5090)}
+.res-row{display:flex;justify-content:space-between;font-size:.72rem;margin:2px 0;padding-bottom:2px;border-bottom:1px solid #141e2a}
+.rk{color:#607888}
+.rv{font-family:monospace;font-weight:600}
+.rv.green{color:#50d898}
+.rv.amber{color:#e0a030}
+.rv.red{color:#e05050}
+.badge{display:inline-block;font-size:.62rem;padding:1px 5px;border-radius:3px;font-weight:600}
+.b-blue{background:#142840;color:#5090d0}
+.b-yellow{background:#2a1e08;color:#c09030}
+.b-green{background:#0a2015;color:#40b060}
+.b-red{background:#2a0808;color:#d04040}
+.charts-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.chart-card{background:#131824;border:1px solid #1e2d45;border-radius:9px;padding:12px}
+canvas.cc{width:100%!important;height:210px!important}
+#band-canvas{width:100%;height:190px;border-radius:6px;background:#08111c;display:block}
+#gaa-canvas{width:100%;height:90px;background:#08111c;border-radius:6px;display:block}
+#sbar{grid-column:1/-1;background:#131824;border:1px solid #1e2d45;border-radius:7px;padding:6px 14px;font-size:.7rem;color:#4a80b0;font-family:monospace}
+.info-box{background:#0a1520;border:1px solid #1a3040;border-radius:6px;padding:8px;font-size:.7rem}
+.info-box .ib-row{display:flex;justify-content:space-between;margin:2px 0}
+.info-box .ik{color:#506070}
+.info-box .iv{font-family:monospace;font-weight:600;color:#50d898}
+select{background:#0a1018;border:1px solid #1e3248;border-radius:4px;color:#90b8d8;font-size:.72rem;padding:3px 6px;width:100%}
+.note{font-size:.65rem;color:#3a5060;font-style:italic;margin-top:4px}
+</style>
+</head>
+<body>
+<div id="app">
+
+<div id="hdr">
+  <div>
+    <h1>NAND GAA CTN Erase Simulator</h1>
+    <div class="sub">Si.Dot 유입/유출 전자 & Leakage 계산</div>
+  </div>
+  <div class="stack-badge">Moly | Al₂O₃ | SiO₂ | Si₃N₄ | SiO₂ | Si.Channel | Oxide | Si.Dot</div>
+  <div class="bias-badge">V_gate = 0V &nbsp;|&nbsp; V_channel = +18V &nbsp;|&nbsp; Si.Dot = Floating</div>
+  <div style="margin-left:auto;font-size:.68rem;color:#304050">GAA / T=300K</div>
+</div>
+
+<!-- LEFT: controls -->
+<div id="left">
+
+  <!-- Bias -->
+  <div class="card">
+    <h2>동작 조건 (Erase)</h2>
+    <div class="row">
+      <span class="lbl">V_channel (+V, erase 구동)</span>
+      <input type="range" id="vch" min="5" max="25" step=".5" value="18">
+      <span class="vval" id="vch-v">18.0 V</span>
+    </div>
+    <div class="row">
+      <span class="lbl">V_gate (Moly, 고정)</span>
+      <span style="font-size:.7rem;font-family:monospace;color:#305048;flex:1">0 V (접지)</span>
+    </div>
+    <div class="row">
+      <span class="lbl">온도 T</span>
+      <input type="range" id="temp" min="200" max="450" step="10" value="300">
+      <span class="vval" id="temp-v">300 K</span>
+    </div>
+    <div class="row">
+      <span class="lbl">Erase 시간 (μs)</span>
+      <input type="range" id="ter" min="1" max="5000" step="1" value="500">
+      <span class="vval" id="ter-v">500 μs</span>
+    </div>
+  </div>
+
+  <!-- Outer stack layers -->
+  <div class="card">
+    <h2>외부 스택: Gate → Si.Channel</h2>
+    <div class="note">이 스택에서 Si₃N₄ 트랩 Erase 전류가 흐릅니다</div>
+    <div class="divider"></div>
+    <table class="tbl">
+      <tr><th>레이어</th><th>d (nm)</th><th>ε_r</th><th>φ_B (eV)</th></tr>
+      <tr><td><span class="badge b-blue">Al₂O₃</span></td>
+          <td><input type="number" id="d_alo" value="5" min="1" max="20" step=".5"></td>
+          <td><input type="number" id="e_alo" value="9.0" min="2" max="30" step=".5"></td>
+          <td><input type="number" id="p_alo" value="2.8" min=".5" max="5" step=".1"></td></tr>
+      <tr><td><span class="badge b-blue">SiO₂</span></td>
+          <td><input type="number" id="d_ox1" value="3" min="1" max="15" step=".5"></td>
+          <td><input type="number" id="e_ox1" value="3.9" min="2" max="30" step=".5"></td>
+          <td><input type="number" id="p_ox1" value="3.1" min=".5" max="5" step=".1"></td></tr>
+      <tr><td><span class="badge b-yellow">Si₃N₄</span></td>
+          <td><input type="number" id="d_nit" value="7" min="1" max="20" step=".5"></td>
+          <td><input type="number" id="e_nit" value="7.5" min="2" max="30" step=".5"></td>
+          <td><input type="number" id="p_nit" value="2.0" min=".5" max="5" step=".1"></td></tr>
+      <tr><td><span class="badge b-blue">SiO₂</span></td>
+          <td><input type="number" id="d_ox2" value="3" min="1" max="15" step=".5"></td>
+          <td><input type="number" id="e_ox2" value="3.9" min="2" max="30" step=".5"></td>
+          <td><input type="number" id="p_ox2" value="3.1" min=".5" max="5" step=".1"></td></tr>
+    </table>
+  </div>
+
+  <!-- Inner tunnel oxide -->
+  <div class="card">
+    <h2>내부 터널 산화막: Si.Channel → Si.Dot</h2>
+    <div class="note">Si.Dot Erase / 전자 유입 경로</div>
+    <div class="divider"></div>
+    <table class="tbl">
+      <tr><th>레이어</th><th>d (nm)</th><th>ε_r</th><th>φ_B (eV)</th></tr>
+      <tr><td><span class="badge b-blue">Oxide</span></td>
+          <td><input type="number" id="d_tox" value="3" min=".5" max="12" step=".5"></td>
+          <td><input type="number" id="e_tox" value="3.9" min="2" max="30" step=".5"></td>
+          <td><input type="number" id="p_tox" value="3.1" min=".5" max="5" step=".1"></td></tr>
+    </table>
+    <div class="divider"></div>
+    <h3>GAA Si.Dot 크기</h3>
+    <div class="row">
+      <span class="lbl">Si.Dot 반지름 r (nm)</span>
+      <input type="range" id="rdot" min="1" max="15" step=".5" value="5">
+      <span class="vval" id="rdot-v">5.0 nm</span>
+    </div>
+    <div id="cdot-info" class="info-box" style="margin-top:4px">
+      <div class="ib-row"><span class="ik">A_dot (단면적)</span><span class="iv" id="iv-a">—</span></div>
+      <div class="ib-row"><span class="ik">C_inner (커패시턴스)</span><span class="iv" id="iv-c">—</span></div>
+    </div>
+  </div>
+
+  <!-- Si.Dot charge state -->
+  <div class="card">
+    <h2>Si.Dot 초기 전하 상태</h2>
+    <div class="row">
+      <span class="lbl">저장 전자 수 Q₀ (개)</span>
+      <input type="range" id="qdot" min="-50" max="500" step="1" value="100">
+      <span class="vval" id="qdot-v">100 e⁻</span>
+    </div>
+    <div class="note">양수: 전자 저장 (Program 후) → Erase 방향<br>음수: 과잉 hole → Si.Channel에서 전자 유입</div>
+    <div id="vdot-info" class="info-box" style="margin-top:6px">
+      <div class="ib-row"><span class="ik">V_inner = V_ch − V_dot</span><span class="iv" id="iv-vi">—</span></div>
+      <div class="ib-row"><span class="ik">E_field (inner oxide)</span><span class="iv" id="iv-ef">—</span></div>
+      <div class="ib-row"><span class="ik">초기 J (Si.Dot 전류)</span><span class="iv" id="iv-j0">—</span></div>
+    </div>
+  </div>
+
+  <button id="run-btn" onclick="runSim()">⚡ 시뮬레이션 실행</button>
+
+  <div class="card" id="res-card" style="display:none">
+    <h2>주요 결과</h2>
+    <div id="res-body"></div>
+  </div>
+</div>
+
+<!-- RIGHT: visualizations -->
+<div id="right">
+
+  <!-- GAA cross-section + band diagram side by side -->
+  <div class="card">
+    <div style="display:grid;grid-template-columns:180px 1fr;gap:10px;align-items:start">
+      <div>
+        <h2>GAA 단면 (개념도)</h2>
+        <canvas id="gaa-canvas"></canvas>
+        <div style="font-size:.62rem;color:#304050;margin-top:3px;text-align:center">중심→외측 단면</div>
+      </div>
+      <div>
+        <h2>에너지 밴드 다이어그램</h2>
+        <canvas id="band-canvas"></canvas>
+        <div style="font-size:.62rem;color:#304050;margin-top:2px">
+          ← Gate(0V) &nbsp; Al₂O₃|SiO₂|Si₃N₄|SiO₂ &nbsp; Si.Ch(+18V) &nbsp; Oxide &nbsp; Si.Dot(floating) →
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Charts -->
+  <div class="charts-grid">
+    <div class="chart-card">
+      <h2>Si.Dot 전자 수 & 전류 vs 시간 (Erase 천이)</h2>
+      <canvas id="c-trans" class="cc"></canvas>
+    </div>
+    <div class="chart-card">
+      <h2>J–V 특성 (내부 산화막: V_inner 기준)</h2>
+      <canvas id="c-jv" class="cc"></canvas>
+    </div>
+    <div class="chart-card">
+      <h2>외부 스택 J–V (Gate → Si.Channel)</h2>
+      <canvas id="c-outer" class="cc"></canvas>
+    </div>
+    <div class="chart-card">
+      <h2>레이어별 전계 & 전압 분포</h2>
+      <canvas id="c-field" class="cc"></canvas>
+    </div>
+  </div>
+</div>
+
+<div id="sbar">준비됨. 파라미터 조정 후 [시뮬레이션 실행]을 클릭하세요.</div>
+</div>
+
+<script>
+// ── 물리 상수 ──────────────────────────────────────────────────────
+const q_e  = 1.602e-19;
+const hbar = 1.055e-34;
+const m0   = 9.109e-31;
+const eps0 = 8.854e-12;
+const kB   = 1.381e-23;
+const hh   = 6.626e-34;
+const eV   = 1.602e-19;
+
+// 유효 질량 (m0 단위)
+const MS = { al2o3:0.20, sio2:0.50, si3n4:0.42 };
+
+// ── 슬라이더 바인딩 ───────────────────────────────────────────────
+function bindSlider(sid, vid, fmt){
+  const s=document.getElementById(sid), v=document.getElementById(vid);
+  const u=()=>v.textContent=fmt(parseFloat(s.value));
+  s.addEventListener('input',u); u();
+}
+bindSlider('vch','vch-v', v=>v.toFixed(1)+' V');
+bindSlider('temp','temp-v', v=>v.toFixed(0)+' K');
+bindSlider('ter','ter-v', v=>v.toFixed(0)+' μs');
+bindSlider('rdot','rdot-v', v=>v.toFixed(1)+' nm');
+bindSlider('qdot','qdot-v', v=>v.toFixed(0)+' e⁻');
+
+// ── 파라미터 읽기 ─────────────────────────────────────────────────
+function getP(){
+  const n=id=>parseFloat(document.getElementById(id).value);
+  const Vch=n('vch'), T=n('temp');
+  const r_dot = n('rdot')*1e-9;
+  const d_tox = n('d_tox')*1e-9;
+  const e_tox = n('e_tox');
+  const A_dot = Math.PI * r_dot * r_dot;
+  const C_inner = e_tox * eps0 / d_tox * A_dot;
+
+  // 외부 스택 레이어
+  const outer = [
+    {name:'Al₂O₃', d:n('d_alo')*1e-9, eps:n('e_alo'), phi:n('p_alo'), ms:MS.al2o3},
+    {name:'SiO₂',  d:n('d_ox1')*1e-9, eps:n('e_ox1'), phi:n('p_ox1'), ms:MS.sio2},
+    {name:'Si₃N₄', d:n('d_nit')*1e-9, eps:n('e_nit'), phi:n('p_nit'), ms:MS.si3n4},
+    {name:'SiO₂',  d:n('d_ox2')*1e-9, eps:n('e_ox2'), phi:n('p_ox2'), ms:MS.sio2},
+  ];
+  const innerOx = {name:'Oxide', d:d_tox, eps:e_tox, phi:n('p_tox'), ms:MS.sio2};
+  const Q0 = n('qdot');
+
+  // 실시간 V_inner 계산
+  const V_inner = Q0 * q_e / C_inner;
+  document.getElementById('iv-a').textContent = (A_dot*1e18).toFixed(1)+' nm²';
+  document.getElementById('iv-c').textContent = fmtE(C_inner)+' F';
+  document.getElementById('iv-vi').textContent = V_inner.toFixed(3)+' V';
+  const E_inner = Math.abs(V_inner)/d_tox;
+  document.getElementById('iv-ef').textContent = (E_inner/1e6).toFixed(0)+' MV/m ('+(E_inner/1e8).toFixed(2)+' MV/cm)';
+  const J0 = fnJ(E_inner, n('p_tox'), MS.sio2, V_inner>=0?1:-1);
+  document.getElementById('iv-j0').textContent = fmtJ(Math.abs(J0));
+
+  return { Vch, T, t_erase:n('ter')*1e-6, r_dot, A_dot, C_inner,
+           outer, innerOx, Q0, V_inner };
+}
+
+// ── FN 전류 밀도 [A/m²] ──────────────────────────────────────────
+// sign: +1 = 정방향(Dot→Channel), -1 = 역방향(Channel→Dot)
+function fnJ(E_Vm, phi_eV, mstar, sign=1){
+  if(E_Vm < 1e6) return 1e-100;
+  const phi = phi_eV * eV;
+  const meff = mstar * m0;
+  const A = q_e**3 / (8*Math.PI*hh*phi) * (m0/meff);
+  const B = (4/3)*Math.sqrt(2*meff)*phi**1.5 / (q_e*hbar);
+  const J = A * E_Vm**2 * Math.exp(-B/E_Vm);
+  return sign * J;
+}
+
+// ── 커패시턴스 분압: 외부 스택 ────────────────────────────────────
+function outerVoltDist(layers, Vtotal){
+  const sum = layers.reduce((s,L)=>s+L.d/L.eps, 0);
+  return layers.map(L=>({
+    ...L,
+    V: Vtotal*(L.d/L.eps)/sum,
+    Ef: Vtotal*(1/L.eps)/sum   // V/m
+  }));
+}
+
+// ── 외부 스택 전류 (N-trap erase) ────────────────────────────────
+// V_channel > V_gate → 전자가 Gate쪽에서 Channel쪽으로 이동 (전계: Channel→Gate)
+// FN: 가장 큰 장벽(bottleneck)이 전류를 제한
+function outerStackJ(layers, Vtotal){
+  const lv = outerVoltDist(layers, Vtotal);
+  const Js = lv.map(L=>fnJ(Math.abs(L.Ef), L.phi, L.ms));
+  const Jmin = Math.min(...Js);
+  return {lv, Js, Jmin};
+}
+
+// ── Si.Dot 전류 계산 (내부 산화막 FN) ────────────────────────────
+function dotJ(Q_electrons, innerOx, C_inner){
+  const V_inner = Q_electrons * q_e / C_inner;
+  const Ef = Math.abs(V_inner) / innerOx.d;
+  const sign = V_inner >= 0 ? 1 : -1;   // +: Dot→Channel(erase), -: Channel→Dot(leakage)
+  const J = fnJ(Ef, innerOx.phi, innerOx.ms, sign);
+  return {J, V_inner, Ef, sign};
+}
+
+// ── Erase 천이 (수치 적분) ───────────────────────────────────────
+function eraseTransient(Q0, A_dot, C_inner, innerOx, t_total, T_K, N=500){
+  const dt = t_total / N;
+  const ts=[], Qs=[], Js=[], Vs=[];
+  let Q = Q0;
+  for(let i=0;i<=N;i++){
+    const {J, V_inner} = dotJ(Q, innerOx, C_inner);
+    ts.push(i*dt*1e6);      // μs
+    Qs.push(Q);
+    Js.push(J);
+    Vs.push(V_inner);
+    // dQ/dt = -J*A/q  (전자 수 감소: 양수 J → electrons leave dot)
+    Q -= (J * A_dot / q_e) * dt;
+  }
+  return {ts, Qs, Js, Vs};
+}
+
+// ── 포맷 헬퍼 ────────────────────────────────────────────────────
+function fmtJ(J){
+  if(!isFinite(J)||J<1e-40) return '~0';
+  const e=Math.floor(Math.log10(Math.abs(J)));
+  return (J/10**e).toFixed(2)+'×10<sup>'+e+'</sup> A/m²';
+}
+function fmtE(x){
+  if(!x||!isFinite(x)||x<1e-40) return '~0';
+  const e=Math.floor(Math.log10(Math.abs(x)));
+  return (x/10**e).toFixed(2)+'×10<sup>'+e+'</sup>';
+}
+function fmtSci(x){
+  if(!x||Math.abs(x)<1e-40) return '~0';
+  const e=Math.floor(Math.log10(Math.abs(x)));
+  return (x/10**e).toFixed(2)+'e'+e;
+}
+
+// ── 차트 관리 ────────────────────────────────────────────────────
+const charts={};
+const dark={grid:{color:'#111d2a'},ticks:{color:'#4a6070',font:{size:9}}};
+function mkChart(id,type,data,opts){
+  if(charts[id]) charts[id].destroy();
+  charts[id]=new Chart(document.getElementById(id),{type,data,options:{
+    ...opts, responsive:true, animation:false,
+    plugins:{legend:{labels:{color:'#7090a8',font:{size:9}}}, ...opts?.plugins},
+  }});
+}
+
+// ── GAA 단면 그리기 ───────────────────────────────────────────────
+function drawGAA(p){
+  const cv=document.getElementById('gaa-canvas');
+  cv.width=cv.offsetWidth||180; cv.height=90;
+  const ctx=cv.getContext('2d');
+  ctx.clearRect(0,0,cv.width,cv.height);
+  ctx.fillStyle='#08111c'; ctx.fillRect(0,0,cv.width,cv.height);
+
+  const cx=cv.width/2, cy=cv.height/2;
+  const scale=3.5; // px per nm
+
+  // 레이어 반경 (안→밖): Si.Dot, Oxide, Si.Channel, SiO2, Si3N4, SiO2, Al2O3, Moly
+  const n=id=>parseFloat(document.getElementById(id).value);
+  const layers=[
+    {r:p.r_dot*1e9,         col:'#1a4030', label:'Dot'},
+    {r:p.r_dot*1e9+n('d_tox'), col:'#1a3050', label:'Ox'},
+    {r:p.r_dot*1e9+n('d_tox')+2, col:'#204030', label:'Si.ch'},
+    {r:p.r_dot*1e9+n('d_tox')+2+n('d_ox2'), col:'#1a3050', label:''},
+    {r:p.r_dot*1e9+n('d_tox')+2+n('d_ox2')+n('d_nit'), col:'#302010', label:'N'},
+    {r:p.r_dot*1e9+n('d_tox')+2+n('d_ox2')+n('d_nit')+n('d_ox1'), col:'#1a3050', label:''},
+    {r:p.r_dot*1e9+n('d_tox')+2+n('d_ox2')+n('d_nit')+n('d_ox1')+n('d_alo'), col:'#1a2840', label:'Al₂O₃'},
+  ];
+
+  // 최외각 반경
+  const maxR = layers[layers.length-1].r;
+  const sc = Math.min((cy-4)/maxR, 3.5);
+
+  // 바깥에서 안쪽으로 그리기
+  for(let i=layers.length-1;i>=0;i--){
+    const L=layers[i];
+    ctx.beginPath();
+    ctx.arc(cx,cy,L.r*sc,0,2*Math.PI);
+    ctx.fillStyle=L.col; ctx.fill();
+    ctx.strokeStyle='#1e3348'; ctx.lineWidth=.7; ctx.stroke();
+  }
+
+  // Moly 테두리
+  ctx.beginPath();
+  ctx.arc(cx,cy,(maxR+3)*sc,0,2*Math.PI);
+  ctx.strokeStyle='#3060a0'; ctx.lineWidth=2; ctx.stroke();
+
+  // 레이블
+  ctx.fillStyle='#50c0ff'; ctx.font='7px monospace'; ctx.textAlign='center';
+  ctx.fillText('Si.Dot', cx, cy+3);
+  ctx.fillStyle='#80a870'; ctx.fillText('Si.Ch', cx, cy-layers[1].r*sc-3);
+  ctx.fillStyle='#8060a0'; ctx.textAlign='left';
+  ctx.fillText('Moly', cx+maxR*sc+4, cy+3);
+}
+
+// ── 밴드 다이어그램 ───────────────────────────────────────────────
+function drawBand(p, outerLV){
+  const cv=document.getElementById('band-canvas');
+  cv.width=cv.offsetWidth||700; cv.height=190;
+  const ctx=cv.getContext('2d');
+  ctx.clearRect(0,0,cv.width,cv.height);
+  ctx.fillStyle='#08111c'; ctx.fillRect(0,0,cv.width,cv.height);
+
+  const pad={l:42,r:20,t:18,b:22};
+  const W=cv.width-pad.l-pad.r, H=cv.height-pad.t-pad.b;
+
+  // 에너지 범위: Gate E_F = 0 기준
+  // E_F,channel = -Vch (전자 에너지 = -qV = -Vch eV)
+  const Emax = 5;
+  const Emin = -(p.Vch+1);
+  const Erange = Emax-Emin;
+
+  function xP(frac){ return pad.l+frac*W; }
+  function yP(e){ return pad.t+H*(1-(e-Emin)/Erange); }
+
+  // 그리드
+  ctx.strokeStyle='#111d2a'; ctx.lineWidth=.8;
+  for(let E=Math.ceil(Emin);E<=Emax;E++){
+    ctx.beginPath(); ctx.moveTo(pad.l,yP(E)); ctx.lineTo(pad.l+W,yP(E)); ctx.stroke();
+  }
+
+  // 전체 폭 = outer_total + Si.ch(separator) + inner
+  const dSich=2; // 화면상 Si.Channel 두께 (nm, 고정)
+  const outerTotal = outerLV.reduce((s,L)=>s+L.d*1e9,0);
+  const innerD = p.innerOx.d*1e9;
+  const dotD = p.r_dot*1e9;
+  const total = outerTotal + dSich + innerD + dotD;
+
+  // 각 레이어 x 비율
+  let cum=0;
+  const xFracs=[];
+  [...outerLV.map(L=>({...L,d_nm:L.d*1e9})),
+   {name:'Si.ch',d_nm:dSich,type:'semi'},
+   {name:'Oxide',d_nm:innerD,type:'ins'},
+   {name:'Si.Dot',d_nm:dotD,type:'dot'}
+  ].forEach(L=>{
+    xFracs.push(cum/total);
+    cum+=L.d_nm;
+  });
+  xFracs.push(1);
+
+  // 레이어 배경
+  const bgCol={ins:'#0e1a28',trap:'#1e1508',semi:'#0a1810',dot:'#0a1a10'};
+  const allLayers=[...outerLV.map(L=>({...L,type:L.name==='Si₃N₄'?'trap':'ins'})),
+    {name:'Si.ch',type:'semi'},{name:'Oxide',type:'ins'},{name:'Si.Dot',type:'dot'}];
+  allLayers.forEach((L,i)=>{
+    const x0=xP(xFracs[i]), x1=xP(xFracs[i+1]);
+    ctx.fillStyle=bgCol[L.type]||'#0e1820';
+    ctx.fillRect(x0,pad.t,x1-x0,H);
+    ctx.strokeStyle='#1a2d3a'; ctx.lineWidth=.6;
+    ctx.beginPath(); ctx.moveTo(x1,pad.t); ctx.lineTo(x1,pad.t+H); ctx.stroke();
+    ctx.fillStyle='#304050'; ctx.font='8px monospace'; ctx.textAlign='center';
+    ctx.fillText(L.name, xP((xFracs[i]+xFracs[i+1])/2), cv.height-6);
+  });
+
+  // ── 외부 스택 밴드 ──────────────────────────────────────────────
+  // Gate E_F=0, Si.Channel E_F=-Vch
+  // 전도대: 게이트쪽에서 시작 = +phi_B (첫번째 레이어)
+  // Channel쪽 끝 = E_C,Si.Channel + phi_B,SiO2_2 = -Vch + phi_B
+  // 선형 보간 (간략화, 레이어 경계 접합은 무시)
+
+  let CB = p.outer[0].phi; // Gate 쪽 시작 CB = +phi_B,Al2O3
+  const outerCBs = [CB];
+  outerLV.forEach((L,i)=>{
+    CB = CB - L.V; // 각 레이어에서 전위 증가(+V) → 전자 에너지 감소
+    outerCBs.push(CB);
+  });
+
+  // 외부 스택 CB 그리기
+  ctx.beginPath(); ctx.strokeStyle='#4488cc'; ctx.lineWidth=2;
+  outerLV.forEach((L,i)=>{
+    const x0=xP(xFracs[i]), x1=xP(xFracs[i+1]);
+    ctx.moveTo(x0,yP(outerCBs[i]));
+    ctx.lineTo(x1,yP(outerCBs[i+1]));
+  });
+  ctx.stroke();
+
+  // Si.Channel 경계 (수직 점선)
+  const xch = xP(xFracs[outerLV.length]);
+  ctx.strokeStyle='#30a060'; ctx.lineWidth=1.2; ctx.setLineDash([3,3]);
+  ctx.beginPath(); ctx.moveTo(xch,pad.t); ctx.lineTo(xch,pad.t+H); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // ── 내부 산화막 밴드 ────────────────────────────────────────────
+  // Si.Channel E_C ≈ -Vch (strongly inverted)
+  // Si.Channel E_F = -Vch
+  // 내부 산화막: CB에서 Si.Channel쪽 = -Vch + phi_B,tox
+  const Vi = p.V_inner; // V_inner = V_ch - V_dot (>0이면 dot이 낮은 전위)
+  const CB_tox_ch  = -p.Vch + p.innerOx.phi;   // Channel쪽 내부 oxide CB
+  const CB_tox_dot = CB_tox_ch + Vi;            // Dot쪽 oxide CB (Vi=V_ch-V_dot, 양수면 낮아짐)
+
+  const xi0 = xP(xFracs[outerLV.length+1]);
+  const xi1 = xP(xFracs[outerLV.length+2]);
+  ctx.beginPath(); ctx.strokeStyle='#44aacc'; ctx.lineWidth=2;
+  ctx.moveTo(xi0, yP(CB_tox_ch));
+  ctx.lineTo(xi1, yP(CB_tox_dot));
+  ctx.stroke();
+
+  // Si.Dot CB 및 E_F
+  const E_F_dot = -p.Vch + Vi;   // Si.Dot E_F = Si.Channel E_F + Vi
+  const xd0=xP(xFracs[outerLV.length+2]), xd1=xP(1);
+  ctx.strokeStyle='#30c080'; ctx.lineWidth=1.6;
+  ctx.beginPath(); ctx.moveTo(xd0,yP(E_F_dot+0.5)); ctx.lineTo(xd1,yP(E_F_dot+0.5)); ctx.stroke();
+  ctx.strokeStyle='#208050'; ctx.lineWidth=1.2; ctx.setLineDash([3,3]);
+  ctx.beginPath(); ctx.moveTo(xd0,yP(E_F_dot)); ctx.lineTo(xd1,yP(E_F_dot)); ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Gate E_F (점선)
+  ctx.strokeStyle='#4060a0'; ctx.lineWidth=1.2; ctx.setLineDash([4,3]);
+  ctx.beginPath(); ctx.moveTo(pad.l,yP(0)); ctx.lineTo(xP(xFracs[1]),yP(0)); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle='#3050a0'; ctx.font='8px sans-serif'; ctx.textAlign='right';
+  ctx.fillText('E_F(Gate)', pad.l-2, yP(0)+3);
+
+  // Si.Channel E_F (수평선)
+  ctx.strokeStyle='#30a060'; ctx.lineWidth=1.5; ctx.setLineDash([4,3]);
+  ctx.beginPath(); ctx.moveTo(xch-10,yP(-p.Vch)); ctx.lineTo(xi0+5,yP(-p.Vch)); ctx.stroke();
+  ctx.setLineDash([]);
+  ctx.fillStyle='#30a060'; ctx.font='7.5px sans-serif'; ctx.textAlign='right';
+  ctx.fillText('E_F(ch) = '+(−p.Vch).toFixed(0)+'eV', xch-2, yP(-p.Vch)-3);
+
+  // FN 터널링 화살표 (내부 산화막, 양방향 표시)
+  if(Math.abs(Vi)>0.1){
+    const arrowY = Vi>0 ? yP(E_F_dot+0.2) : yP(-p.Vch+0.2);
+    const fromX = Vi>0 ? xd0 : xi0;
+    const toX   = Vi>0 ? xi0 : xd0;
+    if(arrowY>pad.t && arrowY<pad.t+H){
+      ctx.strokeStyle='#f0a030'; ctx.lineWidth=1.8;
+      ctx.beginPath(); ctx.moveTo(fromX,arrowY); ctx.lineTo(toX,arrowY); ctx.stroke();
+      const dx=toX>fromX?-6:6;
+      ctx.fillStyle='#f0a030';
+      ctx.beginPath(); ctx.moveTo(toX,arrowY); ctx.lineTo(toX+dx,arrowY-4); ctx.lineTo(toX+dx,arrowY+4); ctx.fill();
+      ctx.font='8px sans-serif'; ctx.textAlign='center'; ctx.fillStyle='#f0a030';
+      const label = Vi>0 ? 'erase e⁻' : 'leakage e⁻';
+      ctx.fillText(label, (xi0+xd0)/2, arrowY-6);
+    }
+  }
+
+  // Y축 레이블
+  ctx.fillStyle='#405060'; ctx.font='8px monospace'; ctx.textAlign='right';
+  for(let E=Math.ceil(Emin+1);E<=Emax;E+=1){
+    if(yP(E)>pad.t && yP(E)<pad.t+H){
+      ctx.fillText(E+'eV', pad.l-3, yP(E)+3);
+    }
+  }
+  ctx.save(); ctx.translate(11,pad.t+H/2); ctx.rotate(-Math.PI/2);
+  ctx.textAlign='center'; ctx.fillStyle='#405060';
+  ctx.fillText('Electron Energy (eV)',0,0); ctx.restore();
+}
+
+// ── 차트: Erase 천이 ─────────────────────────────────────────────
+function plotTransient(p){
+  const tr = eraseTransient(p.Q0, p.A_dot, p.C_inner, p.innerOx, p.t_erase);
+  const Jabs = tr.Js.map(j=>Math.abs(j));
+  const Jlog = Jabs.map(j=>j>1e-40?Math.log10(j):-40);
+
+  mkChart('c-trans','line',{
+    labels: tr.ts.map(t=>t.toFixed(2)),
+    datasets:[
+      {label:'Q_dot (전자 수)', data:tr.Qs, borderColor:'#50d890',
+       backgroundColor:'rgba(40,180,80,.1)', borderWidth:2, pointRadius:0,
+       yAxisID:'y', fill:true},
+      {label:'log₁₀|J| [A/m²]', data:Jlog, borderColor:'#f09030',
+       borderWidth:1.5, pointRadius:0, yAxisID:'y1', fill:false, borderDash:[4,3]},
+    ]
+  },{
+    scales:{
+      x:{title:{display:true,text:'시간 (μs)',color:'#506070',font:{size:9}},
+         grid:dark.grid, ticks:{...dark.ticks, maxTicksLimit:6}},
+      y:{title:{display:true,text:'전자 수 (개)',color:'#506070',font:{size:9}},
+         grid:dark.grid, ticks:dark.ticks, position:'left'},
+      y1:{title:{display:true,text:'log₁₀J',color:'#f09030',font:{size:9}},
+          grid:{display:false}, ticks:{...dark.ticks,color:'#f09030'}, position:'right'},
+    }
+  });
+  return tr;
+}
+
+// ── 차트: J-V 내부 산화막 ─────────────────────────────────────────
+function plotJV_inner(p){
+  // V_inner: -5 ~ +5V (또는 최대 V_inner 기준)
+  const Vmax = Math.max(5, Math.abs(p.V_inner)*1.5);
+  const Varr=[], Jarr=[];
+  for(let V=-Vmax;V<=Vmax;V+=Vmax/50){
+    const Ef = Math.abs(V)/p.innerOx.d;
+    const J  = fnJ(Ef, p.innerOx.phi, p.innerOx.ms, V>=0?1:-1);
+    Varr.push(V.toFixed(3));
+    Jarr.push(Math.abs(J)>1e-40?Math.log10(Math.abs(J)):-40);
+  }
+  // 현재 동작점 표시
+  const opV = p.V_inner;
+  const opJ_raw = fnJ(Math.abs(opV)/p.innerOx.d, p.innerOx.phi, p.innerOx.ms);
+  const opJ = Math.abs(opJ_raw)>1e-40?Math.log10(Math.abs(opJ_raw)):-40;
+
+  mkChart('c-jv','line',{
+    labels:Varr,
+    datasets:[
+      {label:'log₁₀|J| [A/m²]',data:Jarr,borderColor:'#4488dd',
+       backgroundColor:'rgba(30,60,160,.15)',borderWidth:2,pointRadius:0,fill:true},
+      {label:`동작점 (V_inner=${opV.toFixed(2)}V)`,
+       data:[{x:opV.toFixed(3),y:opJ}],type:'scatter',
+       borderColor:'#ff5050',backgroundColor:'#ff5050',pointRadius:6},
+    ]
+  },{
+    scales:{
+      x:{title:{display:true,text:'V_inner (V)',color:'#506070',font:{size:9}},
+         grid:dark.grid, ticks:{...dark.ticks,maxTicksLimit:8}},
+      y:{title:{display:true,text:'log₁₀|J| (A/m²)',color:'#506070',font:{size:9}},
+         grid:dark.grid, ticks:dark.ticks},
+    }
+  });
+}
+
+// ── 차트: 외부 스택 J-V ──────────────────────────────────────────
+function plotJV_outer(p){
+  const Vch_arr=[], J_arr=[], J_by_layer=p.outer.map(()=>[]);
+  for(let Vch=2;Vch<=25;Vch+=.5){
+    const {lv, Js, Jmin} = outerStackJ(p.outer, Vch);
+    Vch_arr.push(Vch.toFixed(1));
+    J_arr.push(Jmin>0?Math.log10(Jmin):-40);
+    Js.forEach((j,i)=>J_by_layer[i].push(j>0?Math.log10(j):-40));
+  }
+  const colors=['#4488dd','#dd8844','#dd4488','#88dd44'];
+  mkChart('c-outer','line',{
+    labels:Vch_arr,
+    datasets:[
+      {label:'J_total (min)',data:J_arr,borderColor:'#50d890',borderWidth:2.5,pointRadius:0,fill:false},
+      ...p.outer.map((L,i)=>({
+        label:L.name,data:J_by_layer[i],borderColor:colors[i],borderWidth:1.2,
+        pointRadius:0,fill:false,borderDash:[3,3],
+      })),
+    ]
+  },{
+    scales:{
+      x:{title:{display:true,text:'V_channel (V)',color:'#506070',font:{size:9}},
+         grid:dark.grid, ticks:dark.ticks},
+      y:{title:{display:true,text:'log₁₀J (A/m²)',color:'#506070',font:{size:9}},
+         grid:dark.grid, ticks:dark.ticks},
+    }
+  });
+}
+
+// ── 차트: 전계 분포 ───────────────────────────────────────────────
+function plotField(outerLV, p){
+  const all = [...outerLV, {name:'Si.ch',Ef:0,V:0},{...p.innerOx,Ef:Math.abs(p.V_inner)/p.innerOx.d, V:p.V_inner}];
+  const names = all.map(L=>L.name);
+  const Vdrops= all.map(L=>Math.abs(L.V||0));
+  const Efs   = all.map(L=>(Math.abs(L.Ef||0)/1e6).toFixed(1));
+  const bkgs  = all.map(L=>L.name==='Si₃N₄'?'rgba(180,140,40,.5)':L.name==='Si.ch'?'rgba(40,160,80,.3)':'rgba(50,100,200,.5)');
+
+  mkChart('c-field','bar',{
+    labels:names,
+    datasets:[
+      {label:'전압 강하 |V| (V)',data:Vdrops,backgroundColor:bkgs,borderColor:'#253545',borderWidth:1,yAxisID:'y'},
+      {label:'|E| (MV/m)',data:Efs,type:'line',borderColor:'#f07040',borderWidth:2,
+       pointRadius:4,fill:false,yAxisID:'y1'},
+    ]
+  },{
+    scales:{
+      x:{grid:dark.grid, ticks:{...dark.ticks,maxRotation:35}},
+      y:{title:{display:true,text:'전압 강하 (V)',color:'#506070',font:{size:9}}, grid:dark.grid, ticks:dark.ticks, position:'left'},
+      y1:{title:{display:true,text:'|E| (MV/m)',color:'#f07040',font:{size:9}}, grid:{display:false}, ticks:{...dark.ticks,color:'#f07040'}, position:'right'},
+    }
+  });
+}
+
+// ── 메인 시뮬레이션 ───────────────────────────────────────────────
+function runSim(){
+  const p = getP();
+  const sbar = document.getElementById('sbar');
+  sbar.textContent='계산 중...';
+
+  setTimeout(()=>{
+    try{
+      // 외부 스택
+      const {lv:outerLV, Jmin:J_outer} = outerStackJ(p.outer, p.Vch);
+
+      // 내부 산화막 (초기 Q)
+      const {J:J_dot_init, V_inner, Ef:Ef_inner} = dotJ(p.Q0, p.innerOx, p.C_inner);
+
+      // Erase 천이
+      const tr = plotTransient(p);
+
+      // 차트들
+      plotJV_inner(p);
+      plotJV_outer(p);
+      plotField(outerLV, p);
+
+      // GAA 단면 & 밴드 다이어그램
+      drawGAA(p);
+      drawBand({...p, V_inner}, outerLV);
+
+      // 결과 요약
+      const Q_final = tr.Qs[tr.Qs.length-1];
+      const V_final = Q_final * q_e / p.C_inner;
+      const J_final = Math.abs(tr.Js[tr.Js.length-1]);
+      const tau_est = p.Q0>0 && Math.abs(J_dot_init)>1e-40
+        ? (p.Q0 * q_e / (Math.abs(J_dot_init) * p.A_dot)) : Infinity;
+
+      const rows=[
+        ['V_channel', `${p.Vch.toFixed(1)} V`,'green'],
+        ['V_inner (초기)', `${V_inner.toFixed(3)} V`, V_inner>0?'amber':V_inner<0?'red':'green'],
+        ['E_field (inner ox 초기)', `${(Ef_inner/1e6).toFixed(0)} MV/m`,'amber'],
+        ['J_dot 초기 (Si.Dot 전류)', fmtSci(Math.abs(J_dot_init))+' A/m²', J_dot_init>0?'amber':'red'],
+        ['전류 방향', J_dot_init>0?'Dot→Channel (Erase)':'Channel→Dot (Leakage)', J_dot_init>0?'green':'red'],
+        ['J_outer (N-trap erase)', fmtSci(J_outer)+' A/m²','amber'],
+        [p.t_erase*1e6 +'μs 후 잔류 전자', `${Q_final.toFixed(1)} 개`,'green'],
+        [p.t_erase*1e6+'μs 후 V_inner', `${V_final.toFixed(3)} V`,'amber'],
+        [p.t_erase*1e6+'μs 후 J_dot', fmtSci(J_final)+' A/m²','amber'],
+        ['이론적 erase τ (초기 J 기준)', isFinite(tau_est)?fmtSci(tau_est)+' s':'—','green'],
+      ];
+
+      const rDiv=document.getElementById('res-body');
+      rDiv.innerHTML=rows.map(([k,v,c])=>
+        `<div class="res-row"><span class="rk">${k}</span><span class="rv ${c}">${v}</span></div>`
+      ).join('');
+      document.getElementById('res-card').style.display='block';
+
+      sbar.textContent=`완료 — V_inner(초기)=${V_inner.toFixed(2)}V | J_dot=${fmtSci(Math.abs(J_dot_init))} A/m² | 방향: ${J_dot_init>0?'Erase(Dot→Ch)':'Leakage(Ch→Dot)'} | ${p.t_erase*1e6}μs 후 Q=${Q_final.toFixed(1)}개`;
+    }catch(e){
+      sbar.textContent='오류: '+e.message; console.error(e);
+    }
+  },10);
+}
+
+// 실시간 정보 업데이트 (슬라이더 변경 시)
+['vch','temp','ter','rdot','qdot','d_alo','e_alo','p_alo','d_ox1','e_ox1','p_ox1',
+ 'd_nit','e_nit','p_nit','d_ox2','e_ox2','p_ox2','d_tox','e_tox','p_tox'].forEach(id=>{
+  const el=document.getElementById(id);
+  if(el) el.addEventListener('input',()=>getP());
+});
+
+window.addEventListener('load',()=>{ getP(); setTimeout(runSim,150); });
+window.addEventListener('resize',()=>{
+  const p=getP();
+  const {lv}=outerStackJ(p.outer,p.Vch);
+  drawGAA(p); drawBand({...p},lv);
+});
+</script>
+</body>
+</html>
