@@ -72,12 +72,17 @@ def _to_float(val) -> float:
         return 0.0
 
 
-def build_ranking(records: list[dict]) -> list[dict]:
+def build_ranking(records: list[dict], year: str = None) -> list[dict]:
     """
     인물별로 가장 최근 접수일(rcept_dt) 레코드를 선택해 랭킹 생성.
+    year 지정 시 해당 연도 레코드만 사용 (예: "2024").
     sp_stock_lmp_cnt = 상장주식 현재 보유수량 (기준값)
     sp_stock_lmp_irds_cnt = 상장주식 증감수량
     """
+    # 연도 필터링
+    if year:
+        records = [r for r in records if r.get("rcept_dt", "").startswith(year)]
+
     # 성명별 최신 레코드 선택
     latest: dict[str, dict] = {}
     for r in records:
@@ -244,7 +249,7 @@ def main():
         print("조회 가능한 데이터가 없습니다.")
         sys.exit(1)
 
-    ranking = build_ranking(records)
+    ranking = build_ranking(records, year="2024")
 
     if not ranking:
         print("랭킹 데이터를 생성할 수 없습니다.")
