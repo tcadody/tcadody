@@ -1,5 +1,6 @@
 anthropic>=0.40.0
 openpyxl>=3.1.0
+requests>=2.31.0
 
 # 카메라 기능 사용 시 (선택)
 # opencv-python>=4.9.0
