@@ -50,6 +50,25 @@ def fetch_elestock(api_key: str, bgn_de: str, end_de: str) -> list[dict]:
     return data.get("list", [])
 
 
+def fetch_executives(api_key: str, bsns_year: str, reprt_code: str = "11011") -> list[dict]:
+    """사업보고서 임원현황(hyslrSttus) 조회."""
+    data = _get(
+        "hyslrSttus",
+        {
+            "crtfc_key": api_key,
+            "corp_code": SK_HYNIX_CORP_CODE,
+            "bsns_year": bsns_year,
+            "reprt_code": reprt_code,
+        },
+    )
+    status = data.get("status")
+    if status == "013":
+        return []
+    if status != "000":
+        raise RuntimeError(f"DART API 오류 [{status}]: {data.get('message')}")
+    return data.get("list", [])
+
+
 # ──────────────────────────────────────────────
 # 데이터 처리
 # ──────────────────────────────────────────────
@@ -312,6 +331,31 @@ def main():
         "sk_hynix_holdings_2024.xlsx",
     )
     save_to_excel(ranking, period, out_path)
+
+    # ── 사업보고서 임원현황에서 임창문 검색 (2022~2024년) ────
+    print("\n" + "═"*70)
+    print("  [추가 검색] 사업보고서 임원현황(hyslrSttus)에서 임창문 검색")
+    print("═"*70)
+    TARGET = "임창문"
+    found_any = False
+    for year in ["2022", "2023", "2024"]:
+        try:
+            execs = fetch_executives(api_key, year)
+        except Exception as e:
+            print(f"  {year}년 조회 실패: {e}")
+            continue
+        hits = [e for e in execs if TARGET in e.get("nm", "")]
+        if hits:
+            found_any = True
+            print(f"\n  ▶ {year}년 사업보고서에서 발견 ({len(hits)}건):")
+            for h in hits:
+                print(f"     성명: {h.get('nm','')}  직위: {h.get('ofcps','')}  등기여부: {h.get('rgist_exctv_at','')}  최종학력: {h.get('edtn_bkgd','')}")
+        else:
+            print(f"  {year}년 사업보고서: '{TARGET}' 없음")
+    if not found_any:
+        print(f"\n  ※ 2022~2024년 사업보고서 임원현황 어디에도 '{TARGET}' 없음")
+        print("     → 이름 철자 확인 또는 임원 등재 전 시점일 수 있음")
+    print("═"*70)
 
 
 if __name__ == "__main__":
