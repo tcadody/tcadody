@@ -72,18 +72,16 @@ def _to_float(val) -> float:
         return 0.0
 
 
-def build_ranking(records: list[dict], year: str = None) -> list[dict]:
+def build_ranking(records: list[dict], as_of_date: str = None) -> list[dict]:
     """
-    인물별로 가장 최근 접수일(rcept_dt) 레코드를 선택해 랭킹 생성.
-    year 지정 시 해당 연도 레코드만 사용 (예: "2024").
-    sp_stock_lmp_cnt = 상장주식 현재 보유수량 (기준값)
-    sp_stock_lmp_irds_cnt = 상장주식 증감수량
+    as_of_date(YYYY-MM-DD) 이하의 공시 중 인물별 가장 최근 레코드를 선택.
+    sp_stock_lmp_cnt = 해당 공시 시점의 상장주식 보유수량
     """
-    # 연도 필터링
-    if year:
-        records = [r for r in records if r.get("rcept_dt", "").startswith(year)]
+    # 기준일 이하 레코드만 사용
+    if as_of_date:
+        records = [r for r in records if r.get("rcept_dt", "") <= as_of_date]
 
-    # 성명별 최신 레코드 선택
+    # 성명별 최신 레코드 선택 (rcept_dt 기준)
     latest: dict[str, dict] = {}
     for r in records:
         nm = r.get("repror", "").strip()
@@ -230,10 +228,10 @@ def main():
     today  = datetime.today()
     end_de = today.strftime("%Y%m%d")
 
-    # API 가 날짜 파라미터를 무시하고 전체 이력을 반환하므로
-    # 전체 데이터를 한 번 받아온 뒤 rcept_dt 로 직접 필터링
-    records = []
-    period  = ""
+    # API가 날짜 파라미터를 무시하므로 전체 이력을 받아 build_ranking 에서 필터링
+    AS_OF = "2024-12-31"  # 이 날짜 이전 마지막 공시 기준으로 스냅샷 생성
+    period = f"2024-12-31 기준 (해당 시점까지의 최신 공시 보유수량)"
+
     print(f"  전체 이력 조회 중...", end=" ", flush=True)
     try:
         all_rows = fetch_elestock(api_key, "20000101", end_de)
@@ -242,29 +240,13 @@ def main():
         print(f"실패 ({e})")
         sys.exit(1)
 
-    # 1순위: 2024 사업보고서 접수분 (보고기준일 2024-12-31, 접수일 2025-01~06)
-    rows_2025h1 = [r for r in all_rows if r.get("rcept_dt", "").startswith("2025-0")]
-    if rows_2025h1:
-        records = rows_2025h1
-        period  = "2024년 사업보고서 기준 (보고기준일 2024-12-31, 접수일 2025-01~06)"
-        print(f"  → 2025년 상반기 접수분 {len(records)}건 사용")
-    else:
-        # 2순위: 2024년 중 접수된 분기·반기 보고
-        rows_2024 = [r for r in all_rows if r.get("rcept_dt", "").startswith("2024-")]
-        if rows_2024:
-            records = rows_2024
-            period  = "2024년 기준 (접수일 2024-01~12)"
-            print(f"  → 2024년 접수분 {len(records)}건 사용")
-        else:
-            records = all_rows
-            period  = "전체 이력 최신 기준"
-            print(f"  → 전체 {len(records)}건 사용")
+    records = all_rows
 
     if not records:
         print("조회 가능한 데이터가 없습니다.")
         sys.exit(1)
 
-    ranking = build_ranking(records)
+    ranking = build_ranking(records, as_of_date=AS_OF)
 
     if not ranking:
         print("랭킹 데이터를 생성할 수 없습니다.")
