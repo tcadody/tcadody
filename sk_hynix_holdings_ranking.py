@@ -43,33 +43,17 @@ def _get(endpoint: str, params: dict) -> dict:
     return resp.json()
 
 
-def fetch_executive_holdings(api_key: str, bsns_year: str, reprt_code: str = "11011") -> list[dict]:
-    """사업보고서 내 임원·주요주주 주식보유현황 조회."""
-    data = _get(
-        "hyslrStockStbck",
-        {
-            "crtfc_key": api_key,
-            "corp_code": SK_HYNIX_CORP_CODE,
-            "bsns_year": bsns_year,
-            "reprt_code": reprt_code,
-        },
-    )
-    status = data.get("status")
-    if status == "013":
-        return []  # 데이터 없음
-    if status != "000":
-        raise RuntimeError(f"DART API 오류 [{status}]: {data.get('message')}")
-    return data.get("list", [])
-
-
-def fetch_elestock(api_key: str, bsns_year: str) -> list[dict]:
-    """임원·주요주주 소유보고서 (개별 변동 이력) 조회."""
+def fetch_elestock(api_key: str, bgn_de: str, end_de: str) -> list[dict]:
+    """임원·주요주주 소유보고 (지분공시) 조회.
+    bgn_de, end_de: YYYYMMDD 형식
+    """
     data = _get(
         "elestock",
         {
             "crtfc_key": api_key,
             "corp_code": SK_HYNIX_CORP_CODE,
-            "bsns_year": bsns_year,
+            "bgn_de": bgn_de,
+            "end_de": end_de,
         },
     )
     status = data.get("status")
@@ -92,54 +76,54 @@ def _to_int(val: str) -> int:
 
 def build_ranking(records: list[dict]) -> list[dict]:
     """
-    인물별로 주식종류를 합산해 보유 주식수 기준 랭킹 리스트 생성.
-    동일 인물이 보통주·우선주 등 여러 행으로 기재된 경우 합산.
+    elestock 보고 이력에서 인물+주식종류별 최신 보고를 골라 합산 후 랭킹 생성.
+    동일 인물이 여러 번 신고한 경우 가장 최근 after_srn_cnt 를 사용.
     """
-    agg: dict[str, dict] = {}
-
+    # (성명, 주식종류) → 가장 최신 레코드 (change_on 기준)
+    latest: dict[tuple, dict] = {}
     for r in records:
         nm = r.get("nm", "").strip()
-        relate = r.get("relate", "").strip()
         stock_knd = r.get("stock_knd", "").strip()
+        change_on = r.get("change_on", "").strip()
+        key = (nm, stock_knd)
+        if key not in latest or change_on > latest[key].get("change_on", ""):
+            latest[key] = r
+
+    # 성명별 합산
+    agg: dict[str, dict] = {}
+    for (nm, stock_knd), r in latest.items():
+        relate = r.get("relate", "").strip()
         after_cnt = _to_int(r.get("after_srn_cnt", "0"))
         before_cnt = _to_int(r.get("before_srn_cnt", "0"))
         incrs_cnt = _to_int(r.get("incrs_srn_cnt", "0"))
         dcrs_cnt = _to_int(r.get("dcrs_srn_cnt", "0"))
+        change_on = r.get("change_on", "").strip()
 
-        key = nm
-        if key not in agg:
-            agg[key] = {
+        if nm not in agg:
+            agg[nm] = {
                 "성명": nm,
                 "관계": relate,
                 "보유주식수_합계": 0,
                 "기초_합계": 0,
                 "증가_합계": 0,
                 "감소_합계": 0,
+                "최근변동일": "",
                 "주식종류_목록": [],
-                "상세": [],
             }
 
-        agg[key]["보유주식수_합계"] += after_cnt
-        agg[key]["기초_합계"] += before_cnt
-        agg[key]["증가_합계"] += incrs_cnt
-        agg[key]["감소_합계"] += dcrs_cnt
-        if stock_knd and stock_knd not in agg[key]["주식종류_목록"]:
-            agg[key]["주식종류_목록"].append(stock_knd)
-        agg[key]["상세"].append(
-            {
-                "주식종류": stock_knd,
-                "기초": before_cnt,
-                "증가": incrs_cnt,
-                "감소": dcrs_cnt,
-                "기말": after_cnt,
-            }
-        )
+        agg[nm]["보유주식수_합계"] += after_cnt
+        agg[nm]["기초_합계"] += before_cnt
+        agg[nm]["증가_합계"] += incrs_cnt
+        agg[nm]["감소_합계"] += dcrs_cnt
+        if change_on > agg[nm]["최근변동일"]:
+            agg[nm]["최근변동일"] = change_on
+        if stock_knd and stock_knd not in agg[nm]["주식종류_목록"]:
+            agg[nm]["주식종류_목록"].append(stock_knd)
 
     ranked = sorted(agg.values(), key=lambda x: x["보유주식수_합계"], reverse=True)
     for i, row in enumerate(ranked, 1):
         row["순위"] = i
         row["주식종류"] = ", ".join(row["주식종류_목록"])
-        # 증감 계산
         row["순증감"] = row["증가_합계"] - row["감소_합계"]
 
     return ranked
@@ -256,39 +240,37 @@ def main():
     if not api_key:
         print("오류: DART_API_KEY 환경변수가 설정되지 않았습니다.")
         print("  발급: https://opendart.fss.or.kr > 인증키 신청/관리")
-        print("  설정: export DART_API_KEY=your_key_here")
+        print("  설정: set DART_API_KEY=발급받은키  (Windows)")
         sys.exit(1)
 
-    # 최신 사업보고서부터 시도 (2024 → 2023 순서)
-    target_year = None
-    records = []
-    for year in [str(datetime.today().year - 1), str(datetime.today().year - 2)]:
-        print(f"  {year}년 사업보고서 조회 중...", end=" ", flush=True)
-        try:
-            rows = fetch_executive_holdings(api_key, year, "11011")
-        except Exception as e:
-            print(f"실패 ({e})")
-            continue
-        if rows:
-            records = rows
-            target_year = year
-            print(f"{len(rows)}건 수신")
-            break
-        print("데이터 없음")
+    # 최근 3년치 소유보고 이력 조회
+    today = datetime.today()
+    end_de = today.strftime("%Y%m%d")
+    bgn_de = today.replace(year=today.year - 3).strftime("%Y%m%d")
+    label_year = str(today.year - 1)
+
+    print(f"  SK하이닉스 임원·주요주주 소유보고 조회 중 ({bgn_de} ~ {end_de})...", end=" ", flush=True)
+    try:
+        records = fetch_elestock(api_key, bgn_de, end_de)
+    except Exception as e:
+        print(f"실패 ({e})")
+        sys.exit(1)
 
     if not records:
-        print("사용 가능한 데이터가 없습니다. 연도 또는 보고서 종류를 확인해주세요.")
+        print("데이터 없음")
+        print("조회된 소유보고 데이터가 없습니다. API 키 또는 조회 기간을 확인해주세요.")
         sys.exit(1)
 
-    reprt_label = REPORT_CODES["11011"]
+    print(f"{len(records)}건 수신")
+
     ranking = build_ranking(records)
-    print_ranking(ranking, target_year, reprt_label)
+    print_ranking(ranking, label_year, "임원·주요주주 소유보고 (최근 3년)")
 
     out_path = os.path.join(
         os.path.dirname(os.path.abspath(__file__)),
-        f"sk_hynix_holdings_{target_year}.xlsx",
+        f"sk_hynix_holdings_{label_year}.xlsx",
     )
-    save_to_excel(ranking, target_year, reprt_label, out_path)
+    save_to_excel(ranking, label_year, "임원·주요주주 소유보고", out_path)
     return out_path
 
 
