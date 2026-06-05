@@ -254,7 +254,20 @@
       transition: all .2s; -webkit-tap-highlight-color: transparent;
     }
     .ctrl-btn:active { opacity: .7; }
-    .ctrl-btn.stop { color: var(--red); border-color: var(--red); }
+    .ctrl-btn.stop     { color: var(--red);   border-color: var(--red); }
+    .ctrl-btn.download { color: var(--green); border-color: var(--green); }
+
+    /* Text input header */
+    .input-header {
+      display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;
+    }
+    .input-header .card-label { margin-bottom: 0; }
+    .upload-btn {
+      background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text2); font-size: 12px; font-weight: 600; padding: 5px 12px;
+      cursor: pointer; transition: all .2s; white-space: nowrap;
+    }
+    .upload-btn:active { opacity: .7; }
 
     .speed-row {
       display: flex; align-items: center; gap: 10px; margin-top: 10px;
@@ -319,8 +332,15 @@
 
 <!-- Sentence -->
 <div class="card">
-  <div class="card-label">English Sentence</div>
-  <textarea id="sentence" placeholder="Type or paste an English sentence here…"
+  <div class="input-header">
+    <div class="card-label">English Text</div>
+    <label class="upload-btn">
+      Upload file
+      <input type="file" accept=".txt,.md,.text,.srt,.csv" style="display:none"
+        onchange="loadTextFile(event)" />
+    </label>
+  </div>
+  <textarea id="sentence" placeholder="Type or paste text here, or upload a file…"
     autocomplete="off" autocorrect="off" spellcheck="false"></textarea>
 </div>
 
@@ -442,6 +462,12 @@
     <button class="ctrl-btn" onclick="replayAudio()">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
       Replay
+    </button>
+    <button class="ctrl-btn download" onclick="downloadAudio()">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M12 3v13M7 11l5 5 5-5"/><path d="M3 20h18"/>
+      </svg>
+      Save MP3
     </button>
     <button class="ctrl-btn stop" onclick="stopAudio()">
       <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
@@ -693,6 +719,32 @@ async function replayAudio() {
 function stopAudio() {
   isPlaying = false;
   if (currentSource) { try { currentSource.stop(); } catch {} currentSource = null; }
+}
+
+function downloadAudio() {
+  if (!lastChunks.length) { showToast('먼저 Generate & Read를 실행해 주세요'); return; }
+  const blob = new Blob(lastChunks, { type: 'audio/mpeg' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href     = url;
+  const name = lastText.substring(0, 40).replace(/[^\w\s-]/g, '').trim().replace(/\s+/g, '_') || 'reading';
+  a.download = `${name}.mp3`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
+}
+
+function loadTextFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    document.getElementById('sentence').value = ev.target.result;
+    showToast(`"${file.name}" 불러왔습니다`);
+  };
+  reader.readAsText(file, 'utf-8');
+  e.target.value = '';
 }
 
 function showResult(text, label) {
