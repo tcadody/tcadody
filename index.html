@@ -492,9 +492,10 @@ let selectedVoice = 'nova';
 let selectedTone = 'Neutral';
 let selectedContext = 'General';
 let lastText = '';
-let lastArrayBuffer = null;
+let lastChunks = [];   // ArrayBuffer[] — stored for replay
 let audioCtx = null;
 let currentSource = null;
+let isPlaying = false;
 
 // ── Init ───────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
@@ -579,12 +580,12 @@ async function handlePlay() {
 
   try {
     const speed = parseFloat(document.getElementById('speedRange').value);
+    const label = claudeAdapted ? 'Claude + OpenAI TTS' : 'OpenAI TTS';
+
+    // 1st attempt: gpt-4o-mini-tts with instructions
     const res = await fetch('https://api.openai.com/v1/audio/speech', {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${openaiKey}`
-      },
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
       body: JSON.stringify({
         model: 'gpt-4o-mini-tts',
         input: textToSpeak,
@@ -595,19 +596,28 @@ async function handlePlay() {
       })
     });
 
-    if (!res.ok) {
+    if (res.ok) {
+      const buf = await res.arrayBuffer();
+      lastChunks = [buf];
+      showResult(textToSpeak, label);
+      await playChunks([buf.slice(0)]);
+    } else {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err?.error?.message || `HTTP ${res.status}`);
+      const msg = err?.error?.message || '';
+      // Token limit hit → fallback: split + tts-1-hd
+      if (res.status === 400 && msg.toLowerCase().includes('token')) {
+        showToast('텍스트가 길어 분할 재생합니다 (tts-1-hd)');
+        const chunks = splitSentences(textToSpeak, 4000);
+        const buffers = await Promise.all(
+          chunks.map(c => fetchTTSChunk(c, 'tts-1-hd', null, speed, openaiKey))
+        );
+        lastChunks = buffers;
+        showResult(textToSpeak, label + ' (chunked)');
+        await playChunks(buffers.map(b => b.slice(0)));
+      } else {
+        throw new Error(msg || `HTTP ${res.status}`);
+      }
     }
-
-    const buf = await res.arrayBuffer();
-    lastArrayBuffer = buf.slice(0);
-
-    const label = claudeAdapted ? 'Claude + OpenAI TTS' : 'OpenAI TTS';
-    const tip = claudeAdapted && claudeAdapted !== sentence ? null : null;
-    showResult(textToSpeak, label);
-    await playBuffer(lastArrayBuffer.slice(0));
-
   } catch (e) {
     showToast('오류: ' + e.message);
   } finally {
@@ -644,23 +654,65 @@ async function claudeRefine(text, apiKey) {
 }
 
 // ── Audio playback ─────────────────────────────────────────────────────────
-async function playBuffer(arrayBuffer) {
+async function fetchTTSChunk(text, model, instructions, speed, apiKey) {
+  const body = { model, input: text, voice: selectedVoice, response_format: 'mp3', speed };
+  if (instructions) body.instructions = instructions;
+  const res = await fetch('https://api.openai.com/v1/audio/speech', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${apiKey}` },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) {
+    const e = await res.json().catch(() => ({}));
+    throw new Error(e?.error?.message || `HTTP ${res.status}`);
+  }
+  return res.arrayBuffer();
+}
+
+function splitSentences(text, maxChars) {
+  if (text.length <= maxChars) return [text];
+  const parts = [];
+  // split on sentence-ending punctuation
+  const segs = text.match(/[^.!?]+[.!?]*\s*/g) || [text];
+  let cur = '';
+  for (const seg of segs) {
+    if (cur.length + seg.length > maxChars && cur) { parts.push(cur.trim()); cur = seg; }
+    else cur += seg;
+  }
+  if (cur.trim()) parts.push(cur.trim());
+  return parts.length ? parts : [text.substring(0, maxChars)];
+}
+
+async function playChunks(buffers) {
+  isPlaying = true;
   stopAudio();
-  const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
-  currentSource = audioCtx.createBufferSource();
-  currentSource.buffer = audioBuffer;
-  currentSource.connect(audioCtx.destination);
-  currentSource.start(0);
+  for (const buf of buffers) {
+    if (!isPlaying) break;
+    await playBufferAndWait(buf);
+  }
+  isPlaying = false;
+}
+
+function playBufferAndWait(arrayBuffer) {
+  return new Promise(async (resolve) => {
+    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+    currentSource = audioCtx.createBufferSource();
+    currentSource.buffer = audioBuffer;
+    currentSource.connect(audioCtx.destination);
+    currentSource.onended = resolve;
+    currentSource.start(0);
+  });
 }
 
 async function replayAudio() {
-  if (!lastArrayBuffer) return;
+  if (!lastChunks.length) return;
   if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   await audioCtx.resume();
-  await playBuffer(lastArrayBuffer.slice(0));
+  await playChunks(lastChunks.map(b => b.slice(0)));
 }
 
 function stopAudio() {
+  isPlaying = false;
   if (currentSource) { try { currentSource.stop(); } catch {} currentSource = null; }
 }
 
