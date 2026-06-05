@@ -663,8 +663,8 @@ function splitSentences(text, maxChars) {
 }
 
 async function playChunks(buffers) {
-  isPlaying = true;
-  stopAudio();
+  stopAudio();    // stop previous — sets isPlaying=false
+  isPlaying = true; // set true AFTER stopAudio
   for (const buf of buffers) {
     if (!isPlaying) break;
     await playBufferAndWait(buf);
@@ -672,9 +672,9 @@ async function playChunks(buffers) {
   isPlaying = false;
 }
 
-function playBufferAndWait(arrayBuffer) {
-  return new Promise(async (resolve) => {
-    const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+async function playBufferAndWait(arrayBuffer) {
+  const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+  return new Promise((resolve) => {
     currentSource = audioCtx.createBufferSource();
     currentSource.buffer = audioBuffer;
     currentSource.connect(audioCtx.destination);
