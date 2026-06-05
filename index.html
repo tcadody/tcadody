@@ -308,6 +308,89 @@
     }
     .toast.show { transform: translateX(-50%) translateY(0); }
 
+    /* Pronunciation dictionary */
+    .pron-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+    }
+    .pron-toggle .arrow {
+      color: var(--text2);
+      font-size: 12px;
+      transition: transform .2s;
+    }
+    .pron-toggle.open .arrow { transform: rotate(180deg); }
+
+    .pron-body { display: none; margin-top: 12px; }
+    .pron-body.visible { display: block; }
+
+    .pron-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+
+    .pron-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: var(--surface2);
+      border-radius: 8px;
+      padding: 8px 10px;
+    }
+    .pron-word {
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--text);
+      min-width: 60px;
+    }
+    .pron-arrow { font-size: 11px; color: var(--text2); }
+    .pron-say { font-size: 13px; color: var(--accent2); flex: 1; }
+    .pron-del {
+      background: none;
+      border: none;
+      color: var(--text2);
+      font-size: 16px;
+      cursor: pointer;
+      padding: 0 2px;
+      line-height: 1;
+    }
+    .pron-del:active { color: var(--red); }
+
+    .pron-add {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .pron-input {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 13px;
+      padding: 8px 10px;
+      outline: none;
+      transition: border-color .2s;
+    }
+    .pron-input:focus { border-color: var(--accent); }
+    .pron-input.word  { width: 90px; }
+    .pron-input.say   { flex: 1; }
+    .pron-add-btn {
+      background: var(--accent);
+      border: none;
+      border-radius: 8px;
+      color: #fff;
+      font-size: 18px;
+      font-weight: 700;
+      width: 34px;
+      height: 34px;
+      cursor: pointer;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .pron-add-btn:active { opacity: .7; }
+    .pron-empty { font-size: 12px; color: var(--text2); padding: 2px 0 6px; }
+
     .modal-bg {
       display: none;
       position: fixed;
@@ -434,6 +517,23 @@
   </div>
 </div>
 
+<!-- Pronunciation Dictionary -->
+<div class="card">
+  <div class="pron-toggle" id="pronToggle" onclick="togglePron()">
+    <div class="card-label" style="margin-bottom:0">Pronunciation Dictionary</div>
+    <span class="arrow">▼</span>
+  </div>
+  <div class="pron-body" id="pronBody">
+    <div class="pron-list" id="pronList"></div>
+    <div class="pron-add">
+      <input class="pron-input word" id="pronWord" placeholder="TCAD" autocorrect="off" autocapitalize="off" spellcheck="false" />
+      <span class="pron-arrow">→</span>
+      <input class="pron-input say"  id="pronSay"  placeholder="tee-cad" autocorrect="off" spellcheck="false" />
+      <button class="pron-add-btn" onclick="addPron()">+</button>
+    </div>
+  </div>
+</div>
+
 <!-- Play Button -->
 <button class="play-btn" id="playBtn" onclick="handlePlay()">
   <span class="btn-text" id="playBtnText">
@@ -515,6 +615,9 @@ window.addEventListener('DOMContentLoaded', () => {
   setupCtxCards();
   loadVoices();
   window.speechSynthesis.onvoiceschanged = loadVoices;
+  renderPronList();
+  document.getElementById('pronWord').addEventListener('keydown', e => { if (e.key === 'Enter') addPron(); });
+  document.getElementById('pronSay').addEventListener('keydown',  e => { if (e.key === 'Enter') addPron(); });
 });
 
 function loadVoices() {
@@ -644,15 +747,82 @@ function showResult(text, tip, label) {
   document.getElementById('voiceRow').style.display = voices.length ? 'flex' : 'none';
 }
 
+function applyPronunciations(text) {
+  const dict = getPronDict();
+  let result = text;
+  for (const [word, say] of Object.entries(dict)) {
+    const escaped = word.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    result = result.replace(new RegExp('\\b' + escaped + '\\b', 'gi'), say);
+  }
+  return result;
+}
+
 function speakText() {
   if (!lastText) return;
   stopSpeech();
-  const utter = new SpeechSynthesisUtterance(lastText);
+  const utter = new SpeechSynthesisUtterance(applyPronunciations(lastText));
   utter.rate = parseFloat(document.getElementById('rateRange').value);
   utter.pitch = 1.0;
   const idx = parseInt(document.getElementById('voiceSelect').value);
   if (voices[idx]) utter.voice = voices[idx];
   window.speechSynthesis.speak(utter);
+}
+
+// ── Pronunciation Dictionary ───────────────────────────────────────────────
+function getPronDict() {
+  try { return JSON.parse(localStorage.getItem('pron_dict') || '{}'); }
+  catch { return {}; }
+}
+function savePronDict(dict) {
+  localStorage.setItem('pron_dict', JSON.stringify(dict));
+}
+
+function togglePron() {
+  const toggle = document.getElementById('pronToggle');
+  const body = document.getElementById('pronBody');
+  toggle.classList.toggle('open');
+  body.classList.toggle('visible');
+}
+
+function renderPronList() {
+  const dict = getPronDict();
+  const list = document.getElementById('pronList');
+  const entries = Object.entries(dict);
+  if (!entries.length) {
+    list.innerHTML = '<div class="pron-empty">등록된 발음이 없습니다</div>';
+    return;
+  }
+  list.innerHTML = entries.map(([word, say]) => `
+    <div class="pron-row">
+      <span class="pron-word">${esc(word)}</span>
+      <span class="pron-arrow">→</span>
+      <span class="pron-say">${esc(say)}</span>
+      <button class="pron-del" onclick="deletePron('${esc(word)}')">×</button>
+    </div>`).join('');
+}
+
+function addPron() {
+  const word = document.getElementById('pronWord').value.trim();
+  const say  = document.getElementById('pronSay').value.trim();
+  if (!word || !say) { showToast('단어와 발음을 모두 입력해 주세요'); return; }
+  const dict = getPronDict();
+  dict[word] = say;
+  savePronDict(dict);
+  document.getElementById('pronWord').value = '';
+  document.getElementById('pronSay').value = '';
+  renderPronList();
+  showToast(`"${word}" → "${say}" 추가됨`);
+}
+
+function deletePron(word) {
+  const dict = getPronDict();
+  delete dict[word];
+  savePronDict(dict);
+  renderPronList();
+}
+
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
 function stopSpeech() { window.speechSynthesis.cancel(); }
