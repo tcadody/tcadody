@@ -391,6 +391,39 @@
     .pron-add-btn:active { opacity: .7; }
     .pron-empty { font-size: 12px; color: var(--text2); padding: 2px 0 6px; }
 
+    .pron-file-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-top: 10px;
+      padding-top: 10px;
+      border-top: 1px solid var(--border);
+    }
+    .pron-file-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text2);
+      font-size: 12px;
+      font-weight: 600;
+      padding: 6px 14px;
+      cursor: pointer;
+      transition: all .2s;
+      white-space: nowrap;
+    }
+    .pron-file-btn:active { opacity: .7; }
+    .pron-file-hint {
+      font-size: 11px;
+      color: var(--text2);
+    }
+    .pron-file-hint code {
+      background: var(--surface2);
+      border-radius: 4px;
+      padding: 1px 5px;
+      font-size: 11px;
+      color: var(--accent2);
+    }
+
     .modal-bg {
       display: none;
       position: fixed;
@@ -530,6 +563,14 @@
       <span class="pron-arrow">→</span>
       <input class="pron-input say"  id="pronSay"  placeholder="tee-cad" autocorrect="off" spellcheck="false" />
       <button class="pron-add-btn" onclick="addPron()">+</button>
+    </div>
+    <div class="pron-file-row">
+      <label class="pron-file-btn" title="CSV/TXT 파일에서 불러오기">
+        Import
+        <input type="file" id="pronFileInput" accept=".csv,.txt" style="display:none" onchange="importPronFile(event)" />
+      </label>
+      <button class="pron-file-btn" onclick="exportPronFile()" title="CSV 파일로 저장">Export</button>
+      <span class="pron-file-hint">CSV 형식: <code>word,say as</code></span>
     </div>
   </div>
 </div>
@@ -819,6 +860,46 @@ function deletePron(word) {
   delete dict[word];
   savePronDict(dict);
   renderPronList();
+}
+
+function exportPronFile() {
+  const dict = getPronDict();
+  const entries = Object.entries(dict);
+  if (!entries.length) { showToast('저장된 발음이 없습니다'); return; }
+  const csv = entries.map(([w, s]) => `${csvEsc(w)},${csvEsc(s)}`).join('\n');
+  const blob = new Blob([csv], { type: 'text/csv' });
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = 'pronunciation.csv';
+  a.click();
+}
+
+function importPronFile(e) {
+  const file = e.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const lines = ev.target.result.split(/\r?\n/).filter(l => l.trim());
+    const dict = getPronDict();
+    let added = 0;
+    for (const line of lines) {
+      // support: word,say  or  word=say  or  word\tsay
+      const m = line.match(/^([^,=\t]+)[,=\t](.+)$/);
+      if (!m) continue;
+      const word = m[1].trim();
+      const say  = m[2].trim();
+      if (word && say) { dict[word] = say; added++; }
+    }
+    savePronDict(dict);
+    renderPronList();
+    showToast(`${added}개 항목 불러왔습니다`);
+  };
+  reader.readAsText(file);
+  e.target.value = '';
+}
+
+function csvEsc(s) {
+  return s.includes(',') || s.includes('"') ? `"${s.replace(/"/g,'""')}"` : s;
 }
 
 function esc(s) {
