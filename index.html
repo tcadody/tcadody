@@ -334,11 +334,9 @@
 <div class="card">
   <div class="input-header">
     <div class="card-label">English Text</div>
-    <label class="upload-btn">
-      Upload file
-      <input type="file" accept=".txt,.md,.text,.srt,.csv" style="display:none"
-        onchange="loadTextFile(event)" />
-    </label>
+    <button class="upload-btn" onclick="document.getElementById('textFileInput').click()">Upload file</button>
+    <input id="textFileInput" type="file" accept="text/plain,text/*,.txt,.md,.text,.srt,.csv"
+      style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none" />
   </div>
   <textarea id="sentence" placeholder="Type or paste text here, or upload a file…"
     autocomplete="off" autocorrect="off" spellcheck="false"></textarea>
@@ -532,6 +530,7 @@ window.addEventListener('DOMContentLoaded', () => {
   renderPronList();
   document.getElementById('pronWord').addEventListener('keydown', e => { if (e.key === 'Enter') addPron(); });
   document.getElementById('pronSay').addEventListener('keydown',  e => { if (e.key === 'Enter') addPron(); });
+  document.getElementById('textFileInput').addEventListener('change', loadTextFile);
 });
 
 function setupChips(selector, onChange) {
