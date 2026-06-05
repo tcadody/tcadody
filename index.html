@@ -371,6 +371,19 @@
       padding: 12px 16px;
       cursor: pointer;
     }
+
+    .no-api-note {
+      text-align: center;
+      font-size: 12px;
+      color: var(--text2);
+      margin-top: -6px;
+      margin-bottom: 14px;
+      line-height: 1.5;
+    }
+    .no-api-note a {
+      color: var(--accent2);
+      text-decoration: none;
+    }
   </style>
 </head>
 <body>
@@ -453,16 +466,19 @@
 
 <!-- Play Button -->
 <button class="play-btn" id="playBtn" onclick="handlePlay()">
-  <span class="btn-text">
+  <span class="btn-text" id="playBtnText">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="margin-right:4px;vertical-align:middle"><path d="M8 5v14l11-7z"/></svg>
-    Generate &amp; Read
+    Read Aloud
   </span>
   <div class="spinner"></div>
 </button>
+<div class="no-api-note" id="apiNote">
+  API 키 없이 바로 사용 가능 &nbsp;·&nbsp; 키가 있으면 Claude가 문장을 다듬어 줍니다
+</div>
 
 <!-- Result -->
 <div class="result-card" id="resultCard">
-  <div class="result-label">Claude's Adapted Text</div>
+  <div class="result-label" id="resultLabel">Reading Text</div>
   <div class="result-text" id="resultText"></div>
   <div class="result-meta" id="resultMeta"></div>
   <div class="tts-controls" id="ttsControls">
@@ -501,8 +517,8 @@
 <!-- API Key Modal -->
 <div class="modal-bg" id="modalBg" onclick="handleModalBgClick(event)">
   <div class="modal">
-    <h2>Anthropic API Key</h2>
-    <p>Claude API를 사용하기 위한 키를 입력하세요. 키는 이 기기에만 저장됩니다.</p>
+    <h2>Anthropic API Key <span style="font-size:12px;color:var(--text2);font-weight:400">(선택)</span></h2>
+    <p>입력하면 Claude가 톤·배경에 맞게 문장을 다듬어 줍니다.<br>없어도 앱은 정상 작동합니다. 키는 이 기기에만 저장됩니다.</p>
     <input type="password" id="apiKeyInput" placeholder="sk-ant-..." autocomplete="off" />
     <div class="modal-btns">
       <button class="modal-cancel" onclick="closeApiModal()">취소</button>
@@ -518,15 +534,41 @@ let selectedContext = 'General';
 let voices = [];
 let lastAdaptedText = '';
 
+// tone → [rate, pitch]
+const TONE_PRESETS = {
+  'Neutral':      [1.0, 1.0],
+  'Formal':       [0.88, 0.92],
+  'Casual':       [1.1,  1.1],
+  'Dramatic':     [0.78, 0.85],
+  'Friendly':     [1.1,  1.2],
+  'News Anchor':  [0.93, 0.95],
+  'Storytelling': [0.82, 1.0],
+  'Confident':    [1.0,  0.88],
+};
+
 // ── Init ───────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
   updateApiBtn();
-  setupChips('toneChips', (v) => { selectedTone = v; updatePromptPreview(); });
+  setupChips('toneChips', (v) => {
+    selectedTone = v;
+    applyTonePreset(v);
+    updatePromptPreview();
+  });
   setupCtxCards(() => updatePromptPreview());
   loadVoices();
   window.speechSynthesis.onvoiceschanged = loadVoices;
   updatePromptPreview();
 });
+
+function applyTonePreset(tone) {
+  const [rate, pitch] = TONE_PRESETS[tone] || [1.0, 1.0];
+  const rr = document.getElementById('rateRange');
+  const pr = document.getElementById('pitchRange');
+  rr.value = rate;
+  pr.value = pitch;
+  document.getElementById('rateVal').textContent = rate.toFixed(1);
+  document.getElementById('pitchVal').textContent = pitch.toFixed(1);
+}
 
 function loadVoices() {
   voices = window.speechSynthesis.getVoices().filter(v => v.lang.startsWith('en'));
@@ -612,11 +654,18 @@ async function handlePlay() {
   if (!sentence) { showToast('문장을 입력해 주세요'); return; }
 
   const apiKey = localStorage.getItem('anthropic_api_key');
-  if (!apiKey) { openApiModal(); return; }
+
+  // No API key — read original sentence directly
+  if (!apiKey) {
+    lastAdaptedText = sentence;
+    document.getElementById('resultLabel').textContent = 'Reading Text';
+    showResult(sentence, getTipForTone(selectedTone));
+    speakText();
+    return;
+  }
 
   setLoading(true);
 
-  // Use custom prompt if edited
   const promptText = document.getElementById('customPrompt').value || buildPrompt(sentence);
 
   try {
@@ -637,7 +686,13 @@ async function handlePlay() {
 
     if (!res.ok) {
       const err = await res.json().catch(() => ({}));
-      throw new Error(err?.error?.message || `HTTP ${res.status}`);
+      // Fallback to direct read on API error
+      showToast('Claude 오류 — 원문으로 읽습니다');
+      lastAdaptedText = sentence;
+      document.getElementById('resultLabel').textContent = 'Reading Text';
+      showResult(sentence, getTipForTone(selectedTone));
+      speakText();
+      return;
     }
 
     const data = await res.json();
@@ -651,6 +706,7 @@ async function handlePlay() {
     }
 
     lastAdaptedText = parsed.adapted || sentence;
+    document.getElementById('resultLabel').textContent = "Claude's Adapted Text";
     showResult(lastAdaptedText, parsed.tip || '');
     speakText();
   } catch (e) {
@@ -658,6 +714,20 @@ async function handlePlay() {
   } finally {
     setLoading(false);
   }
+}
+
+function getTipForTone(tone) {
+  const tips = {
+    'Neutral':      'Read at a comfortable, steady pace.',
+    'Formal':       'Speak slowly and clearly, with deliberate pauses.',
+    'Casual':       'Keep it light and natural, like chatting with a friend.',
+    'Dramatic':     'Slow down, lower your voice, and pause for effect.',
+    'Friendly':     'Smile while you speak — it comes through in your voice.',
+    'News Anchor':  'Project confidence. Crisp consonants, steady rhythm.',
+    'Storytelling': 'Paint the scene. Vary your pace to build tension.',
+    'Confident':    'Speak with authority. Keep your voice steady and full.',
+  };
+  return tips[tone] || '';
 }
 
 function setLoading(on) {
@@ -713,12 +783,18 @@ function saveApiKey() {
 
 function updateApiBtn() {
   const btn = document.getElementById('apiBtn');
+  const note = document.getElementById('apiNote');
+  const playTxt = document.getElementById('playBtnText');
   if (localStorage.getItem('anthropic_api_key')) {
-    btn.textContent = '● API Connected';
+    btn.textContent = '● Claude ON';
     btn.classList.add('connected');
+    note.style.display = 'none';
+    playTxt.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="margin-right:4px;vertical-align:middle"><path d="M8 5v14l11-7z"/></svg>Generate &amp; Read';
   } else {
-    btn.textContent = 'API Key';
+    btn.textContent = 'Claude (선택)';
     btn.classList.remove('connected');
+    note.style.display = '';
+    playTxt.innerHTML = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="margin-right:4px;vertical-align:middle"><path d="M8 5v14l11-7z"/></svg>Read Aloud';
   }
 }
 
