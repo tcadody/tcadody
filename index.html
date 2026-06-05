@@ -257,17 +257,6 @@
     .ctrl-btn.stop     { color: var(--red);   border-color: var(--red); }
     .ctrl-btn.download { color: var(--green); border-color: var(--green); }
 
-    /* Text input header */
-    .input-header {
-      display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px;
-    }
-    .input-header .card-label { margin-bottom: 0; }
-    .upload-btn {
-      background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
-      color: var(--text2); font-size: 12px; font-weight: 600; padding: 5px 12px;
-      cursor: pointer; transition: all .2s; white-space: nowrap;
-    }
-    .upload-btn:active { opacity: .7; }
 
     .speed-row {
       display: flex; align-items: center; gap: 10px; margin-top: 10px;
@@ -332,13 +321,8 @@
 
 <!-- Sentence -->
 <div class="card">
-  <div class="input-header">
-    <div class="card-label">English Text</div>
-    <label class="upload-btn" for="textFileInput">Upload file</label>
-    <input id="textFileInput" type="file" accept=".txt,.md,.text,.srt,.csv,text/plain"
-      style="display:none" />
-  </div>
-  <textarea id="sentence" placeholder="Type or paste text here, or upload a file…"
+  <div class="card-label">English Text</div>
+  <textarea id="sentence" placeholder="Type or paste an English sentence here…"
     autocomplete="off" autocorrect="off" spellcheck="false"></textarea>
 </div>
 
@@ -530,8 +514,6 @@ window.addEventListener('DOMContentLoaded', () => {
   renderPronList();
   document.getElementById('pronWord').addEventListener('keydown', e => { if (e.key === 'Enter') addPron(); });
   document.getElementById('pronSay').addEventListener('keydown',  e => { if (e.key === 'Enter') addPron(); });
-  document.getElementById('textFileInput').addEventListener('change', loadTextFile);
-  // ↑ belt-and-suspenders: label[for] handles click, addEventListener handles the change
 });
 
 function setupChips(selector, onChange) {
@@ -735,20 +717,6 @@ function downloadAudio() {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function loadTextFile(e) {
-  const file = e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = ev => {
-    const text = ev.target.result;
-    document.getElementById('sentence').value = text;
-    document.getElementById('sentence').dispatchEvent(new Event('input'));
-    showToast(`"${file.name}" 불러왔습니다 (${text.length.toLocaleString()}자)`);
-    e.target.value = ''; // reset after load so same file can be re-uploaded
-  };
-  reader.onerror = () => showToast('파일을 읽을 수 없습니다');
-  reader.readAsText(file, 'utf-8');
-}
 
 function showResult(text, label) {
   document.getElementById('resultLabel').textContent = label;
