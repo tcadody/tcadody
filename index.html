@@ -222,6 +222,13 @@
       margin-top: 12px;
       gap: 8px;
     }
+
+    @keyframes pulse-play {
+      0%   { box-shadow: 0 0 0 0 rgba(108,99,255,.5); }
+      70%  { box-shadow: 0 0 0 10px rgba(108,99,255,0); }
+      100% { box-shadow: 0 0 0 0 rgba(108,99,255,0); }
+    }
+    .tts-btn.pulse { animation: pulse-play .7s ease 2; }
     .tts-controls.visible { display: flex; }
 
     .tts-btn {
@@ -579,7 +586,7 @@ async function handlePlay() {
   if (!apiKey) {
     lastText = sentence;
     showResult(sentence, '', 'Reading Text');
-    speakText();
+    speakText(); // safe: called directly from user gesture
     return;
   }
 
@@ -604,7 +611,7 @@ async function handlePlay() {
       showToast('Claude 오류 — 원문으로 읽습니다');
       lastText = sentence;
       showResult(sentence, '', 'Reading Text');
-      speakText();
+      pulsePlayBtn();
       return;
     }
 
@@ -616,7 +623,9 @@ async function handlePlay() {
 
     lastText = parsed.adapted || sentence;
     showResult(lastText, parsed.tip || '', "Claude's Adapted Text");
-    speakText();
+    // Don't auto-play here — iOS Safari blocks speech from async callbacks.
+    // Pulse the Play button so the user knows to tap it.
+    pulsePlayBtn();
   } catch (e) {
     showToast('오류: ' + e.message);
   } finally {
@@ -647,6 +656,15 @@ function speakText() {
 }
 
 function stopSpeech() { window.speechSynthesis.cancel(); }
+
+function pulsePlayBtn() {
+  const btn = document.querySelector('#ttsControls .tts-btn');
+  if (!btn) return;
+  btn.classList.remove('pulse');
+  void btn.offsetWidth; // reflow to restart animation
+  btn.classList.add('pulse');
+  btn.addEventListener('animationend', () => btn.classList.remove('pulse'), { once: true });
+}
 
 function setLoading(on) {
   const btn = document.getElementById('playBtn');
