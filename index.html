@@ -334,9 +334,9 @@
 <div class="card">
   <div class="input-header">
     <div class="card-label">English Text</div>
-    <button class="upload-btn" onclick="document.getElementById('textFileInput').click()">Upload file</button>
-    <input id="textFileInput" type="file" accept="text/plain,text/*,.txt,.md,.text,.srt,.csv"
-      style="position:absolute;width:1px;height:1px;opacity:0;pointer-events:none" />
+    <label class="upload-btn" for="textFileInput">Upload file</label>
+    <input id="textFileInput" type="file" accept=".txt,.md,.text,.srt,.csv,text/plain"
+      style="display:none" />
   </div>
   <textarea id="sentence" placeholder="Type or paste text here, or upload a file…"
     autocomplete="off" autocorrect="off" spellcheck="false"></textarea>
@@ -531,6 +531,7 @@ window.addEventListener('DOMContentLoaded', () => {
   document.getElementById('pronWord').addEventListener('keydown', e => { if (e.key === 'Enter') addPron(); });
   document.getElementById('pronSay').addEventListener('keydown',  e => { if (e.key === 'Enter') addPron(); });
   document.getElementById('textFileInput').addEventListener('change', loadTextFile);
+  // ↑ belt-and-suspenders: label[for] handles click, addEventListener handles the change
 });
 
 function setupChips(selector, onChange) {
@@ -739,11 +740,14 @@ function loadTextFile(e) {
   if (!file) return;
   const reader = new FileReader();
   reader.onload = ev => {
-    document.getElementById('sentence').value = ev.target.result;
-    showToast(`"${file.name}" 불러왔습니다`);
+    const text = ev.target.result;
+    document.getElementById('sentence').value = text;
+    document.getElementById('sentence').dispatchEvent(new Event('input'));
+    showToast(`"${file.name}" 불러왔습니다 (${text.length.toLocaleString()}자)`);
+    e.target.value = ''; // reset after load so same file can be re-uploaded
   };
+  reader.onerror = () => showToast('파일을 읽을 수 없습니다');
   reader.readAsText(file, 'utf-8');
-  e.target.value = '';
 }
 
 function showResult(text, label) {
