@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>English Reader</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f0f13;
+      --surface: #1a1a22;
+      --surface2: #22222e;
+      --border: #2e2e40;
+      --accent: #6c63ff;
+      --accent2: #a78bfa;
+      --text: #e8e8f0;
+      --text2: #9090a8;
+      --green: #22c55e;
+      --red: #ef4444;
+      --radius: 14px;
+    }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100dvh;
+      padding: 16px;
+      padding-bottom: 40px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 8px 0 20px;
+    }
+
+    header h1 {
+      font-size: 20px;
+      font-weight: 700;
+      background: linear-gradient(135deg, var(--accent2), var(--accent));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .api-btn {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--text2);
+      font-size: 12px;
+      padding: 6px 12px;
+      border-radius: 20px;
+      cursor: pointer;
+      transition: all .2s;
+    }
+    .api-btn.connected { color: var(--green); border-color: var(--green); }
+    .api-btn:active { opacity: .7; }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+
+    .card-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--text2);
+      margin-bottom: 10px;
+    }
+
+    textarea {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 16px;
+      line-height: 1.6;
+      padding: 12px;
+      resize: vertical;
+      min-height: 100px;
+      outline: none;
+      transition: border-color .2s;
+    }
+    textarea:focus { border-color: var(--accent); }
+    textarea::placeholder { color: var(--text2); }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .chip {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      color: var(--text2);
+      font-size: 13px;
+      padding: 6px 14px;
+      cursor: pointer;
+      transition: all .2s;
+      user-select: none;
+    }
+    .chip.active {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .chip:active { opacity: .7; }
+
+    .context-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+    }
+
+    .ctx-card {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      cursor: pointer;
+      transition: all .2s;
+      user-select: none;
+    }
+    .ctx-card.active {
+      border-color: var(--accent2);
+      background: rgba(108,99,255,.15);
+    }
+    .ctx-card .ctx-icon { font-size: 20px; margin-bottom: 4px; }
+    .ctx-card .ctx-name { font-size: 12px; font-weight: 600; color: var(--text); }
+    .ctx-card .ctx-desc { font-size: 11px; color: var(--text2); margin-top: 2px; }
+
+    .advanced-toggle {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 12px;
+      color: var(--text2);
+      cursor: pointer;
+      padding: 4px 0;
+      user-select: none;
+    }
+    .advanced-toggle svg { transition: transform .2s; }
+    .advanced-toggle.open svg { transform: rotate(90deg); }
+
+    .prompt-preview {
+      display: none;
+      margin-top: 10px;
+    }
+    .prompt-preview.visible { display: block; }
+
+    .prompt-preview textarea {
+      font-family: 'SF Mono', 'Fira Code', monospace;
+      font-size: 12px;
+      min-height: 120px;
+      color: var(--text2);
+      line-height: 1.5;
+    }
+
+    .play-btn {
+      width: 100%;
+      background: linear-gradient(135deg, var(--accent), #8b5cf6);
+      border: none;
+      border-radius: var(--radius);
+      color: #fff;
+      font-size: 16px;
+      font-weight: 700;
+      padding: 16px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 10px;
+      margin-bottom: 12px;
+      transition: opacity .2s, transform .1s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .play-btn:active { opacity: .85; transform: scale(.98); }
+    .play-btn:disabled { opacity: .4; cursor: not-allowed; }
+
+    .play-btn .spinner {
+      width: 20px; height: 20px;
+      border: 2px solid rgba(255,255,255,.3);
+      border-top-color: #fff;
+      border-radius: 50%;
+      animation: spin .7s linear infinite;
+      display: none;
+    }
+    .play-btn.loading .spinner { display: block; }
+    .play-btn.loading .btn-text { display: none; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .result-card {
+      display: none;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 16px;
+      margin-bottom: 12px;
+    }
+    .result-card.visible { display: block; }
+
+    .result-label {
+      font-size: 11px;
+      font-weight: 600;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--accent2);
+      margin-bottom: 8px;
+    }
+
+    .result-text {
+      font-size: 16px;
+      line-height: 1.7;
+      color: var(--text);
+    }
+
+    .result-meta {
+      margin-top: 10px;
+      font-size: 12px;
+      color: var(--text2);
+      line-height: 1.6;
+    }
+
+    .tts-controls {
+      display: none;
+      margin-top: 12px;
+      gap: 8px;
+    }
+    .tts-controls.visible { display: flex; }
+
+    .tts-btn {
+      flex: 1;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 10px;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      transition: all .2s;
+      -webkit-tap-highlight-color: transparent;
+    }
+    .tts-btn:active { opacity: .7; }
+    .tts-btn.stop { color: var(--red); border-color: var(--red); }
+
+    .tts-settings {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-top: 12px;
+    }
+
+    .range-group label {
+      font-size: 11px;
+      color: var(--text2);
+      margin-bottom: 4px;
+      display: block;
+    }
+    .range-group input[type=range] {
+      width: 100%;
+      accent-color: var(--accent);
+    }
+    .range-val {
+      font-size: 11px;
+      color: var(--accent2);
+      font-weight: 600;
+    }
+
+    .voice-select {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 13px;
+      padding: 8px 10px;
+      outline: none;
+      margin-top: 10px;
+    }
+
+    .toast {
+      position: fixed;
+      bottom: 24px;
+      left: 50%;
+      transform: translateX(-50%) translateY(80px);
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      color: var(--text);
+      font-size: 13px;
+      padding: 10px 20px;
+      transition: transform .3s ease;
+      z-index: 999;
+      white-space: nowrap;
+    }
+    .toast.show { transform: translateX(-50%) translateY(0); }
+
+    /* API key modal */
+    .modal-bg {
+      display: none;
+      position: fixed;
+      inset: 0;
+      background: rgba(0,0,0,.7);
+      z-index: 100;
+      align-items: flex-end;
+      justify-content: center;
+      padding: 16px;
+    }
+    .modal-bg.open { display: flex; }
+
+    .modal {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 20px 20px 20px 20px;
+      padding: 24px;
+      width: 100%;
+      max-width: 480px;
+    }
+    .modal h2 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
+    .modal p { font-size: 13px; color: var(--text2); margin-bottom: 16px; line-height: 1.5; }
+
+    .modal input {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text);
+      font-size: 14px;
+      padding: 12px;
+      outline: none;
+      margin-bottom: 12px;
+      transition: border-color .2s;
+    }
+    .modal input:focus { border-color: var(--accent); }
+
+    .modal-btns { display: flex; gap: 8px; }
+    .modal-save {
+      flex: 1;
+      background: var(--accent);
+      border: none;
+      border-radius: 10px;
+      color: #fff;
+      font-size: 14px;
+      font-weight: 700;
+      padding: 12px;
+      cursor: pointer;
+    }
+    .modal-cancel {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      color: var(--text2);
+      font-size: 14px;
+      padding: 12px 16px;
+      cursor: pointer;
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <h1>English Reader</h1>
+  <button class="api-btn" id="apiBtn" onclick="openApiModal()">API Key</button>
+</header>
+
+<!-- Sentence Input -->
+<div class="card">
+  <div class="card-label">English Sentence</div>
+  <textarea id="sentence" placeholder="Type or paste an English sentence here…" autocomplete="off" autocorrect="off" spellcheck="false"></textarea>
+</div>
+
+<!-- Tone -->
+<div class="card">
+  <div class="card-label">Tone</div>
+  <div class="chips" id="toneChips">
+    <div class="chip active" data-val="Neutral">Neutral</div>
+    <div class="chip" data-val="Formal">Formal</div>
+    <div class="chip" data-val="Casual">Casual</div>
+    <div class="chip" data-val="Dramatic">Dramatic</div>
+    <div class="chip" data-val="Friendly">Friendly</div>
+    <div class="chip" data-val="News Anchor">News Anchor</div>
+    <div class="chip" data-val="Storytelling">Storytelling</div>
+    <div class="chip" data-val="Confident">Confident</div>
+  </div>
+</div>
+
+<!-- Context -->
+<div class="card">
+  <div class="card-label">Context / Background</div>
+  <div class="context-grid" id="ctxCards">
+    <div class="ctx-card active" data-val="General">
+      <div class="ctx-icon">💬</div>
+      <div class="ctx-name">General</div>
+      <div class="ctx-desc">Everyday use</div>
+    </div>
+    <div class="ctx-card" data-val="Business Meeting">
+      <div class="ctx-icon">💼</div>
+      <div class="ctx-name">Business</div>
+      <div class="ctx-desc">Professional setting</div>
+    </div>
+    <div class="ctx-card" data-val="Presentation">
+      <div class="ctx-icon">📊</div>
+      <div class="ctx-name">Presentation</div>
+      <div class="ctx-desc">Audience-facing</div>
+    </div>
+    <div class="ctx-card" data-val="Casual Conversation">
+      <div class="ctx-icon">☕</div>
+      <div class="ctx-name">Casual Chat</div>
+      <div class="ctx-desc">Friends / social</div>
+    </div>
+    <div class="ctx-card" data-val="News Broadcast">
+      <div class="ctx-icon">📰</div>
+      <div class="ctx-name">News</div>
+      <div class="ctx-desc">Broadcast style</div>
+    </div>
+    <div class="ctx-card" data-val="Storytelling / Narration">
+      <div class="ctx-icon">📖</div>
+      <div class="ctx-name">Storytelling</div>
+      <div class="ctx-desc">Narrative style</div>
+    </div>
+  </div>
+</div>
+
+<!-- Advanced Prompt -->
+<div class="card">
+  <div class="advanced-toggle" id="advToggle" onclick="toggleAdvanced()">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+      <polyline points="9 18 15 12 9 6"/>
+    </svg>
+    Advanced — Edit Prompt
+  </div>
+  <div class="prompt-preview" id="promptPreview">
+    <textarea id="customPrompt" placeholder="Claude에게 보낼 프롬프트를 직접 수정할 수 있어요" rows="6"></textarea>
+  </div>
+</div>
+
+<!-- Play Button -->
+<button class="play-btn" id="playBtn" onclick="handlePlay()">
+  <span class="btn-text">
+    <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="margin-right:4px;vertical-align:middle"><path d="M8 5v14l11-7z"/></svg>
+    Generate &amp; Read
+  </span>
+  <div class="spinner"></div>
+</button>
+
+<!-- Result -->
+<div class="result-card" id="resultCard">
+  <div class="result-label">Claude's Adapted Text</div>
+  <div class="result-text" id="resultText"></div>
+  <div class="result-meta" id="resultMeta"></div>
+  <div class="tts-controls" id="ttsControls">
+    <button class="tts-btn" onclick="speakText()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+      Play
+    </button>
+    <button class="tts-btn stop" onclick="stopSpeech()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2"/></svg>
+      Stop
+    </button>
+  </div>
+</div>
+
+<!-- TTS Settings -->
+<div class="card" id="ttsSettingsCard" style="display:none">
+  <div class="card-label">Voice Settings</div>
+  <div class="tts-settings">
+    <div class="range-group">
+      <label>Speed <span class="range-val" id="rateVal">1.0</span></label>
+      <input type="range" id="rateRange" min="0.5" max="2" step="0.1" value="1.0"
+        oninput="document.getElementById('rateVal').textContent=parseFloat(this.value).toFixed(1)">
+    </div>
+    <div class="range-group">
+      <label>Pitch <span class="range-val" id="pitchVal">1.0</span></label>
+      <input type="range" id="pitchRange" min="0.5" max="2" step="0.1" value="1.0"
+        oninput="document.getElementById('pitchVal').textContent=parseFloat(this.value).toFixed(1)">
+    </div>
+  </div>
+  <select class="voice-select" id="voiceSelect"></select>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- API Key Modal -->
+<div class="modal-bg" id="modalBg" onclick="handleModalBgClick(event)">
+  <div class="modal">
+    <h2>Anthropic API Key</h2>
+    <p>Claude API를 사용하기 위한 키를 입력하세요. 키는 이 기기에만 저장됩니다.</p>
+    <input type="password" id="apiKeyInput" placeholder="sk-ant-..." autocomplete="off" />
+    <div class="modal-btns">
+      <button class="modal-cancel" onclick="closeApiModal()">취소</button>
+      <button class="modal-save" onclick="saveApiKey()">저장</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let selectedTone = 'Neutral';
+let selectedContext = 'General';
+let voices = [];
+let lastAdaptedText = '';
+
+// ── Init ───────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  updateApiBtn();
+  setupChips('toneChips', (v) => { selectedTone = v; updatePromptPreview(); });
+  setupCtxCards(() => updatePromptPreview());
+  loadVoices();
+  window.speechSynthesis.onvoiceschanged = loadVoices;
+  updatePromptPreview();
+});
+
+function loadVoices() {
+  voices = window.speechSynthesis.getVoices().filter(v => v.lang.startsWith('en'));
+  const sel = document.getElementById('voiceSelect');
+  sel.innerHTML = voices.map((v, i) =>
+    `<option value="${i}">${v.name} (${v.lang})</option>`
+  ).join('');
+  // prefer en-US
+  const preferred = voices.findIndex(v => v.lang === 'en-US');
+  if (preferred >= 0) sel.value = preferred;
+  if (voices.length) document.getElementById('ttsSettingsCard').style.display = 'block';
+}
+
+// ── Chips & Cards ──────────────────────────────────────────────────────────
+function setupChips(containerId, onChange) {
+  const chips = document.querySelectorAll(`#${containerId} .chip`);
+  chips.forEach(c => {
+    c.addEventListener('click', () => {
+      chips.forEach(x => x.classList.remove('active'));
+      c.classList.add('active');
+      onChange(c.dataset.val);
+    });
+  });
+}
+
+function setupCtxCards(onChange) {
+  const cards = document.querySelectorAll('#ctxCards .ctx-card');
+  cards.forEach(c => {
+    c.addEventListener('click', () => {
+      cards.forEach(x => x.classList.remove('active'));
+      c.classList.add('active');
+      selectedContext = c.dataset.val;
+      onChange();
+    });
+  });
+}
+
+// ── Advanced Prompt ────────────────────────────────────────────────────────
+function toggleAdvanced() {
+  const toggle = document.getElementById('advToggle');
+  const preview = document.getElementById('promptPreview');
+  toggle.classList.toggle('open');
+  preview.classList.toggle('visible');
+  if (preview.classList.contains('visible')) updatePromptPreview();
+}
+
+function buildPrompt(sentence) {
+  return `You are an expert English speech coach and text adaptor.
+
+The user wants to read the following English sentence aloud:
+"${sentence}"
+
+Settings:
+- Tone: ${selectedTone}
+- Context / Background: ${selectedContext}
+
+Your task:
+1. Adapt or lightly rewrite the sentence so it sounds natural and fits the specified tone and context perfectly.
+2. Provide a short reading tip (1–2 sentences) on HOW to deliver it — e.g., pace, emphasis, emotion.
+
+Respond in this exact JSON format:
+{
+  "adapted": "<the adapted sentence>",
+  "tip": "<reading tip>"
+}
+
+Only return the JSON. No other text.`;
+}
+
+function updatePromptPreview() {
+  const sentence = document.getElementById('sentence').value || '(your sentence here)';
+  document.getElementById('customPrompt').value = buildPrompt(sentence);
+}
+
+document.getElementById('sentence').addEventListener('input', () => {
+  const preview = document.getElementById('promptPreview');
+  if (preview.classList.contains('visible')) updatePromptPreview();
+});
+
+// ── Play ───────────────────────────────────────────────────────────────────
+async function handlePlay() {
+  const sentence = document.getElementById('sentence').value.trim();
+  if (!sentence) { showToast('문장을 입력해 주세요'); return; }
+
+  const apiKey = localStorage.getItem('anthropic_api_key');
+  if (!apiKey) { openApiModal(); return; }
+
+  setLoading(true);
+
+  // Use custom prompt if edited
+  const promptText = document.getElementById('customPrompt').value || buildPrompt(sentence);
+
+  try {
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+        'anthropic-dangerous-direct-browser-access': 'true'
+      },
+      body: JSON.stringify({
+        model: 'claude-haiku-4-5-20251001',
+        max_tokens: 512,
+        messages: [{ role: 'user', content: promptText }]
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.error?.message || `HTTP ${res.status}`);
+    }
+
+    const data = await res.json();
+    const raw = data.content?.[0]?.text || '';
+
+    let parsed;
+    try {
+      parsed = JSON.parse(raw.replace(/```json|```/g, '').trim());
+    } catch {
+      parsed = { adapted: raw, tip: '' };
+    }
+
+    lastAdaptedText = parsed.adapted || sentence;
+    showResult(lastAdaptedText, parsed.tip || '');
+    speakText();
+  } catch (e) {
+    showToast('오류: ' + e.message);
+  } finally {
+    setLoading(false);
+  }
+}
+
+function setLoading(on) {
+  const btn = document.getElementById('playBtn');
+  btn.classList.toggle('loading', on);
+  btn.disabled = on;
+}
+
+function showResult(text, tip) {
+  document.getElementById('resultText').textContent = text;
+  document.getElementById('resultMeta').textContent = tip ? '💡 ' + tip : '';
+  document.getElementById('resultCard').classList.add('visible');
+  document.getElementById('ttsControls').classList.add('visible');
+}
+
+// ── TTS ────────────────────────────────────────────────────────────────────
+function speakText() {
+  if (!lastAdaptedText) return;
+  stopSpeech();
+  const utter = new SpeechSynthesisUtterance(lastAdaptedText);
+  utter.rate = parseFloat(document.getElementById('rateRange').value);
+  utter.pitch = parseFloat(document.getElementById('pitchRange').value);
+  const voiceIdx = parseInt(document.getElementById('voiceSelect').value);
+  if (voices[voiceIdx]) utter.voice = voices[voiceIdx];
+  window.speechSynthesis.speak(utter);
+}
+
+function stopSpeech() {
+  window.speechSynthesis.cancel();
+}
+
+// ── API Key Modal ──────────────────────────────────────────────────────────
+function openApiModal() {
+  document.getElementById('apiKeyInput').value = localStorage.getItem('anthropic_api_key') || '';
+  document.getElementById('modalBg').classList.add('open');
+}
+
+function closeApiModal() {
+  document.getElementById('modalBg').classList.remove('open');
+}
+
+function saveApiKey() {
+  const key = document.getElementById('apiKeyInput').value.trim();
+  if (key) {
+    localStorage.setItem('anthropic_api_key', key);
+    showToast('API 키가 저장되었습니다');
+  } else {
+    localStorage.removeItem('anthropic_api_key');
+  }
+  updateApiBtn();
+  closeApiModal();
+}
+
+function updateApiBtn() {
+  const btn = document.getElementById('apiBtn');
+  if (localStorage.getItem('anthropic_api_key')) {
+    btn.textContent = '● API Connected';
+    btn.classList.add('connected');
+  } else {
+    btn.textContent = 'API Key';
+    btn.classList.remove('connected');
+  }
+}
+
+function handleModalBgClick(e) {
+  if (e.target === document.getElementById('modalBg')) closeApiModal();
+}
+
+// ── Toast ──────────────────────────────────────────────────────────────────
+let toastTimer;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2800);
+}
+</script>
+</body>
+</html>
