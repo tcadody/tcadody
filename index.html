@@ -27,7 +27,7 @@
       color: var(--text);
       min-height: 100dvh;
       padding: 16px;
-      padding-bottom: 40px;
+      padding-bottom: 48px;
     }
 
     header {
@@ -36,7 +36,6 @@
       justify-content: space-between;
       padding: 8px 0 20px;
     }
-
     header h1 {
       font-size: 20px;
       font-weight: 700;
@@ -46,7 +45,7 @@
       background-clip: text;
     }
 
-    .api-btn {
+    .key-btn {
       background: var(--surface2);
       border: 1px solid var(--border);
       color: var(--text2);
@@ -55,9 +54,10 @@
       border-radius: 20px;
       cursor: pointer;
       transition: all .2s;
+      white-space: nowrap;
     }
-    .api-btn.connected { color: var(--green); border-color: var(--green); }
-    .api-btn:active { opacity: .7; }
+    .key-btn.ready { color: var(--green); border-color: var(--green); }
+    .key-btn:active { opacity: .7; }
 
     .card {
       background: var(--surface);
@@ -66,7 +66,6 @@
       padding: 16px;
       margin-bottom: 12px;
     }
-
     .card-label {
       font-size: 11px;
       font-weight: 600;
@@ -93,12 +92,32 @@
     textarea:focus { border-color: var(--accent); }
     textarea::placeholder { color: var(--text2); }
 
-    .chips {
-      display: flex;
-      flex-wrap: wrap;
+    /* Voice chips */
+    .voice-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
       gap: 8px;
     }
+    .v-chip {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 8px 10px;
+      cursor: pointer;
+      transition: all .2s;
+      user-select: none;
+      text-align: center;
+    }
+    .v-chip.active {
+      border-color: var(--accent);
+      background: rgba(108,99,255,.15);
+    }
+    .v-chip:active { opacity: .7; }
+    .v-chip .v-name { font-size: 13px; font-weight: 600; color: var(--text); }
+    .v-chip .v-desc { font-size: 10px; color: var(--text2); margin-top: 2px; }
 
+    /* Tone chips */
+    .chips { display: flex; flex-wrap: wrap; gap: 8px; }
     .chip {
       background: var(--surface2);
       border: 1px solid var(--border);
@@ -110,19 +129,11 @@
       transition: all .2s;
       user-select: none;
     }
-    .chip.active {
-      background: var(--accent);
-      border-color: var(--accent);
-      color: #fff;
-    }
+    .chip.active { background: var(--accent); border-color: var(--accent); color: #fff; }
     .chip:active { opacity: .7; }
 
-    .context-grid {
-      display: grid;
-      grid-template-columns: 1fr 1fr;
-      gap: 8px;
-    }
-
+    /* Context grid */
+    .context-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
     .ctx-card {
       background: var(--surface2);
       border: 1px solid var(--border);
@@ -132,35 +143,77 @@
       transition: all .2s;
       user-select: none;
     }
-    .ctx-card.active {
-      border-color: var(--accent2);
-      background: rgba(108,99,255,.15);
-    }
+    .ctx-card.active { border-color: var(--accent2); background: rgba(108,99,255,.15); }
     .ctx-card .ctx-icon { font-size: 20px; margin-bottom: 4px; }
     .ctx-card .ctx-name { font-size: 12px; font-weight: 600; color: var(--text); }
     .ctx-card .ctx-desc { font-size: 11px; color: var(--text2); margin-top: 2px; }
 
+    /* Pronunciation dictionary */
+    .pron-toggle {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      cursor: pointer;
+      user-select: none;
+    }
+    .pron-toggle .arrow { color: var(--text2); font-size: 12px; transition: transform .2s; }
+    .pron-toggle.open .arrow { transform: rotate(180deg); }
+    .pron-body { display: none; margin-top: 12px; }
+    .pron-body.visible { display: block; }
+    .pron-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+    .pron-row {
+      display: flex; align-items: center; gap: 8px;
+      background: var(--surface2); border-radius: 8px; padding: 8px 10px;
+    }
+    .pron-word { font-size: 13px; font-weight: 600; color: var(--text); min-width: 60px; }
+    .pron-arrow { font-size: 11px; color: var(--text2); }
+    .pron-say  { font-size: 13px; color: var(--accent2); flex: 1; }
+    .pron-del  { background: none; border: none; color: var(--text2); font-size: 16px; cursor: pointer; padding: 0 2px; line-height: 1; }
+    .pron-del:active { color: var(--red); }
+    .pron-add  { display: flex; gap: 6px; align-items: center; }
+    .pron-input {
+      background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text); font-size: 13px; padding: 8px 10px; outline: none; transition: border-color .2s;
+    }
+    .pron-input:focus { border-color: var(--accent); }
+    .pron-input.word { width: 90px; }
+    .pron-input.say  { flex: 1; }
+    .pron-add-btn {
+      background: var(--accent); border: none; border-radius: 8px; color: #fff;
+      font-size: 18px; font-weight: 700; width: 34px; height: 34px; cursor: pointer;
+      flex-shrink: 0; display: flex; align-items: center; justify-content: center;
+    }
+    .pron-add-btn:active { opacity: .7; }
+    .pron-empty { font-size: 12px; color: var(--text2); padding: 2px 0 6px; }
+    .pron-file-row {
+      display: flex; align-items: center; gap: 8px;
+      margin-top: 10px; padding-top: 10px; border-top: 1px solid var(--border);
+    }
+    .pron-file-btn {
+      background: var(--surface2); border: 1px solid var(--border); border-radius: 8px;
+      color: var(--text2); font-size: 12px; font-weight: 600; padding: 6px 14px;
+      cursor: pointer; transition: all .2s; white-space: nowrap;
+    }
+    .pron-file-btn:active { opacity: .7; }
+    .pron-file-hint { font-size: 11px; color: var(--text2); }
+    .pron-file-hint code {
+      background: var(--surface2); border-radius: 4px; padding: 1px 5px;
+      font-size: 11px; color: var(--accent2);
+    }
+
+    /* Play button */
     .play-btn {
       width: 100%;
       background: linear-gradient(135deg, var(--accent), #8b5cf6);
-      border: none;
-      border-radius: var(--radius);
-      color: #fff;
-      font-size: 16px;
-      font-weight: 700;
-      padding: 16px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 10px;
-      margin-bottom: 12px;
+      border: none; border-radius: var(--radius); color: #fff;
+      font-size: 16px; font-weight: 700; padding: 16px;
+      cursor: pointer; display: flex; align-items: center; justify-content: center;
+      gap: 10px; margin-bottom: 12px;
       transition: opacity .2s, transform .1s;
       -webkit-tap-highlight-color: transparent;
     }
     .play-btn:active { opacity: .85; transform: scale(.98); }
     .play-btn:disabled { opacity: .4; cursor: not-allowed; }
-
     .play-btn .spinner {
       width: 20px; height: 20px;
       border: 2px solid rgba(255,255,255,.3);
@@ -171,316 +224,89 @@
     }
     .play-btn.loading .spinner { display: block; }
     .play-btn.loading .btn-text { display: none; }
-
     @keyframes spin { to { transform: rotate(360deg); } }
 
-    .no-api-note {
-      text-align: center;
-      font-size: 12px;
-      color: var(--text2);
-      margin-top: -6px;
-      margin-bottom: 14px;
-    }
-
+    /* Result */
     .result-card {
-      display: none;
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      padding: 16px;
-      margin-bottom: 12px;
+      display: none; background: var(--surface); border: 1px solid var(--border);
+      border-radius: var(--radius); padding: 16px; margin-bottom: 12px;
     }
     .result-card.visible { display: block; }
-
     .result-label {
-      font-size: 11px;
-      font-weight: 600;
-      letter-spacing: .08em;
-      text-transform: uppercase;
-      color: var(--accent2);
-      margin-bottom: 8px;
+      font-size: 11px; font-weight: 600; letter-spacing: .08em;
+      text-transform: uppercase; color: var(--accent2); margin-bottom: 8px;
     }
-
-    .result-text {
-      font-size: 16px;
-      line-height: 1.7;
-      color: var(--text);
-    }
-
+    .result-text { font-size: 15px; line-height: 1.7; color: var(--text); }
     .result-tip {
-      margin-top: 10px;
-      font-size: 12px;
-      color: var(--text2);
-      line-height: 1.6;
-      padding: 8px 10px;
-      background: var(--surface2);
-      border-radius: 8px;
+      margin-top: 10px; font-size: 12px; color: var(--text2);
+      line-height: 1.6; padding: 8px 10px;
+      background: var(--surface2); border-radius: 8px;
     }
 
-    .tts-controls {
-      display: none;
-      margin-top: 12px;
-      gap: 8px;
+    .audio-controls {
+      display: flex; gap: 8px; margin-top: 12px; align-items: center;
     }
+    .ctrl-btn {
+      flex: 1; background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 10px; color: var(--text); font-size: 13px; font-weight: 600;
+      padding: 10px; cursor: pointer;
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      transition: all .2s; -webkit-tap-highlight-color: transparent;
+    }
+    .ctrl-btn:active { opacity: .7; }
+    .ctrl-btn.stop { color: var(--red); border-color: var(--red); }
 
-    @keyframes pulse-play {
-      0%   { box-shadow: 0 0 0 0 rgba(108,99,255,.5); }
-      70%  { box-shadow: 0 0 0 10px rgba(108,99,255,0); }
-      100% { box-shadow: 0 0 0 0 rgba(108,99,255,0); }
+    .speed-row {
+      display: flex; align-items: center; gap: 10px; margin-top: 10px;
     }
-    .tts-btn.pulse { animation: pulse-play .7s ease 2; }
-    .tts-controls.visible { display: flex; }
+    .speed-row label { font-size: 11px; color: var(--text2); white-space: nowrap; }
+    .speed-row input[type=range] { flex: 1; accent-color: var(--accent); }
+    .speed-val { font-size: 11px; color: var(--accent2); font-weight: 600; min-width: 28px; }
 
-    .tts-btn {
-      flex: 1;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      color: var(--text);
-      font-size: 13px;
-      font-weight: 600;
-      padding: 10px;
-      cursor: pointer;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      gap: 6px;
-      transition: all .2s;
-      -webkit-tap-highlight-color: transparent;
-    }
-    .tts-btn:active { opacity: .7; }
-    .tts-btn.stop { color: var(--red); border-color: var(--red); }
-
-    /* Speed + voice */
-    .voice-row {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-      margin-top: 10px;
-    }
-    .speed-group {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      flex-shrink: 0;
-    }
-    .speed-group label {
-      font-size: 11px;
-      color: var(--text2);
-      white-space: nowrap;
-    }
-    .speed-group input[type=range] {
-      width: 80px;
-      accent-color: var(--accent);
-    }
-    .range-val {
-      font-size: 11px;
-      color: var(--accent2);
-      font-weight: 600;
-      min-width: 24px;
-    }
-    .voice-select {
-      flex: 1;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      color: var(--text);
-      font-size: 12px;
-      padding: 7px 8px;
-      outline: none;
-      min-width: 0;
-    }
-
+    /* Toast */
     .toast {
-      position: fixed;
-      bottom: 24px;
-      left: 50%;
+      position: fixed; bottom: 24px; left: 50%;
       transform: translateX(-50%) translateY(80px);
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      color: var(--text);
-      font-size: 13px;
-      padding: 10px 20px;
-      transition: transform .3s ease;
-      z-index: 999;
-      white-space: nowrap;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 20px; color: var(--text); font-size: 13px;
+      padding: 10px 20px; transition: transform .3s ease;
+      z-index: 999; white-space: nowrap;
     }
     .toast.show { transform: translateX(-50%) translateY(0); }
 
-    /* Pronunciation dictionary */
-    .pron-toggle {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      cursor: pointer;
-      user-select: none;
-    }
-    .pron-toggle .arrow {
-      color: var(--text2);
-      font-size: 12px;
-      transition: transform .2s;
-    }
-    .pron-toggle.open .arrow { transform: rotate(180deg); }
-
-    .pron-body { display: none; margin-top: 12px; }
-    .pron-body.visible { display: block; }
-
-    .pron-list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
-
-    .pron-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      background: var(--surface2);
-      border-radius: 8px;
-      padding: 8px 10px;
-    }
-    .pron-word {
-      font-size: 13px;
-      font-weight: 600;
-      color: var(--text);
-      min-width: 60px;
-    }
-    .pron-arrow { font-size: 11px; color: var(--text2); }
-    .pron-say { font-size: 13px; color: var(--accent2); flex: 1; }
-    .pron-del {
-      background: none;
-      border: none;
-      color: var(--text2);
-      font-size: 16px;
-      cursor: pointer;
-      padding: 0 2px;
-      line-height: 1;
-    }
-    .pron-del:active { color: var(--red); }
-
-    .pron-add {
-      display: flex;
-      gap: 6px;
-      align-items: center;
-    }
-    .pron-input {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      color: var(--text);
-      font-size: 13px;
-      padding: 8px 10px;
-      outline: none;
-      transition: border-color .2s;
-    }
-    .pron-input:focus { border-color: var(--accent); }
-    .pron-input.word  { width: 90px; }
-    .pron-input.say   { flex: 1; }
-    .pron-add-btn {
-      background: var(--accent);
-      border: none;
-      border-radius: 8px;
-      color: #fff;
-      font-size: 18px;
-      font-weight: 700;
-      width: 34px;
-      height: 34px;
-      cursor: pointer;
-      flex-shrink: 0;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-    }
-    .pron-add-btn:active { opacity: .7; }
-    .pron-empty { font-size: 12px; color: var(--text2); padding: 2px 0 6px; }
-
-    .pron-file-row {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      margin-top: 10px;
-      padding-top: 10px;
-      border-top: 1px solid var(--border);
-    }
-    .pron-file-btn {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 8px;
-      color: var(--text2);
-      font-size: 12px;
-      font-weight: 600;
-      padding: 6px 14px;
-      cursor: pointer;
-      transition: all .2s;
-      white-space: nowrap;
-    }
-    .pron-file-btn:active { opacity: .7; }
-    .pron-file-hint {
-      font-size: 11px;
-      color: var(--text2);
-    }
-    .pron-file-hint code {
-      background: var(--surface2);
-      border-radius: 4px;
-      padding: 1px 5px;
-      font-size: 11px;
-      color: var(--accent2);
-    }
-
+    /* Modal */
     .modal-bg {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,.7);
-      z-index: 100;
-      align-items: flex-end;
-      justify-content: center;
-      padding: 16px;
+      display: none; position: fixed; inset: 0; background: rgba(0,0,0,.7);
+      z-index: 100; align-items: flex-end; justify-content: center; padding: 16px;
     }
     .modal-bg.open { display: flex; }
-
     .modal {
-      background: var(--surface);
-      border: 1px solid var(--border);
-      border-radius: 20px;
-      padding: 24px;
-      width: 100%;
-      max-width: 480px;
+      background: var(--surface); border: 1px solid var(--border);
+      border-radius: 20px; padding: 24px; width: 100%; max-width: 480px;
     }
-    .modal h2 { font-size: 16px; font-weight: 700; margin-bottom: 8px; }
-    .modal p { font-size: 13px; color: var(--text2); margin-bottom: 16px; line-height: 1.5; }
-
-    .modal input {
-      width: 100%;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      color: var(--text);
-      font-size: 14px;
-      padding: 12px;
-      outline: none;
-      margin-bottom: 12px;
-      transition: border-color .2s;
+    .modal h2 { font-size: 16px; font-weight: 700; margin-bottom: 6px; }
+    .modal .modal-sub { font-size: 12px; color: var(--text2); margin-bottom: 16px; line-height: 1.5; }
+    .modal-field { margin-bottom: 12px; }
+    .modal-field label {
+      display: block; font-size: 11px; font-weight: 600;
+      color: var(--text2); margin-bottom: 5px; letter-spacing: .05em;
     }
-    .modal input:focus { border-color: var(--accent); }
-
+    .modal-field input {
+      width: 100%; background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 10px; color: var(--text); font-size: 14px;
+      padding: 11px 12px; outline: none; transition: border-color .2s;
+    }
+    .modal-field input:focus { border-color: var(--accent); }
+    .modal-divider { border: none; border-top: 1px solid var(--border); margin: 14px 0; }
     .modal-btns { display: flex; gap: 8px; }
     .modal-save {
-      flex: 1;
-      background: var(--accent);
-      border: none;
-      border-radius: 10px;
-      color: #fff;
-      font-size: 14px;
-      font-weight: 700;
-      padding: 12px;
-      cursor: pointer;
+      flex: 1; background: var(--accent); border: none; border-radius: 10px;
+      color: #fff; font-size: 14px; font-weight: 700; padding: 12px; cursor: pointer;
     }
     .modal-cancel {
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: 10px;
-      color: var(--text2);
-      font-size: 14px;
-      padding: 12px 16px;
-      cursor: pointer;
+      background: var(--surface2); border: 1px solid var(--border);
+      border-radius: 10px; color: var(--text2); font-size: 14px;
+      padding: 12px 16px; cursor: pointer;
     }
   </style>
 </head>
@@ -488,14 +314,39 @@
 
 <header>
   <h1>English Reader</h1>
-  <button class="api-btn" id="apiBtn" onclick="openApiModal()">Claude (선택)</button>
+  <button class="key-btn" id="keyBtn" onclick="openKeyModal()">API Keys</button>
 </header>
 
-<!-- Sentence Input -->
+<!-- Sentence -->
 <div class="card">
   <div class="card-label">English Sentence</div>
   <textarea id="sentence" placeholder="Type or paste an English sentence here…"
     autocomplete="off" autocorrect="off" spellcheck="false"></textarea>
+</div>
+
+<!-- Voice -->
+<div class="card">
+  <div class="card-label">Voice</div>
+  <div class="voice-grid" id="voiceGrid">
+    <div class="v-chip" data-val="alloy">
+      <div class="v-name">Alloy</div><div class="v-desc">Neutral</div>
+    </div>
+    <div class="v-chip" data-val="echo">
+      <div class="v-name">Echo</div><div class="v-desc">Clear, male</div>
+    </div>
+    <div class="v-chip" data-val="fable">
+      <div class="v-name">Fable</div><div class="v-desc">Warm, British</div>
+    </div>
+    <div class="v-chip" data-val="onyx">
+      <div class="v-name">Onyx</div><div class="v-desc">Deep, male</div>
+    </div>
+    <div class="v-chip active" data-val="nova">
+      <div class="v-name">Nova</div><div class="v-desc">Bright, female</div>
+    </div>
+    <div class="v-chip" data-val="shimmer">
+      <div class="v-name">Shimmer</div><div class="v-desc">Gentle, female</div>
+    </div>
+  </div>
 </div>
 
 <!-- Tone -->
@@ -519,33 +370,27 @@
   <div class="context-grid" id="ctxCards">
     <div class="ctx-card active" data-val="General">
       <div class="ctx-icon">💬</div>
-      <div class="ctx-name">General</div>
-      <div class="ctx-desc">Everyday use</div>
+      <div class="ctx-name">General</div><div class="ctx-desc">Everyday use</div>
     </div>
     <div class="ctx-card" data-val="Business Meeting">
       <div class="ctx-icon">💼</div>
-      <div class="ctx-name">Business</div>
-      <div class="ctx-desc">Professional setting</div>
+      <div class="ctx-name">Business</div><div class="ctx-desc">Professional setting</div>
     </div>
     <div class="ctx-card" data-val="Presentation">
       <div class="ctx-icon">📊</div>
-      <div class="ctx-name">Presentation</div>
-      <div class="ctx-desc">Audience-facing</div>
+      <div class="ctx-name">Presentation</div><div class="ctx-desc">Audience-facing</div>
     </div>
     <div class="ctx-card" data-val="Casual Conversation">
       <div class="ctx-icon">☕</div>
-      <div class="ctx-name">Casual Chat</div>
-      <div class="ctx-desc">Friends / social</div>
+      <div class="ctx-name">Casual Chat</div><div class="ctx-desc">Friends / social</div>
     </div>
     <div class="ctx-card" data-val="News Broadcast">
       <div class="ctx-icon">📰</div>
-      <div class="ctx-name">News</div>
-      <div class="ctx-desc">Broadcast style</div>
+      <div class="ctx-name">News</div><div class="ctx-desc">Broadcast style</div>
     </div>
     <div class="ctx-card" data-val="Storytelling / Narration">
       <div class="ctx-icon">📖</div>
-      <div class="ctx-name">Storytelling</div>
-      <div class="ctx-desc">Narrative style</div>
+      <div class="ctx-name">Storytelling</div><div class="ctx-desc">Narrative style</div>
     </div>
   </div>
 </div>
@@ -559,130 +404,116 @@
   <div class="pron-body" id="pronBody">
     <div class="pron-list" id="pronList"></div>
     <div class="pron-add">
-      <input class="pron-input word" id="pronWord" placeholder="TCAD" autocorrect="off" autocapitalize="off" spellcheck="false" />
+      <input class="pron-input word" id="pronWord" placeholder="TCAD"
+        autocorrect="off" autocapitalize="off" spellcheck="false" />
       <span class="pron-arrow">→</span>
-      <input class="pron-input say"  id="pronSay"  placeholder="tee-cad" autocorrect="off" spellcheck="false" />
+      <input class="pron-input say" id="pronSay" placeholder="tee-cad"
+        autocorrect="off" spellcheck="false" />
       <button class="pron-add-btn" onclick="addPron()">+</button>
     </div>
     <div class="pron-file-row">
-      <label class="pron-file-btn" title="CSV/TXT 파일에서 불러오기">
+      <label class="pron-file-btn">
         Import
-        <input type="file" id="pronFileInput" accept=".csv,.txt" style="display:none" onchange="importPronFile(event)" />
+        <input type="file" accept=".csv,.txt" style="display:none"
+          onchange="importPronFile(event)" />
       </label>
-      <button class="pron-file-btn" onclick="exportPronFile()" title="CSV 파일로 저장">Export</button>
-      <span class="pron-file-hint">CSV 형식: <code>word,say as</code></span>
+      <button class="pron-file-btn" onclick="exportPronFile()">Export</button>
+      <span class="pron-file-hint">CSV: <code>word,say as</code></span>
     </div>
   </div>
 </div>
 
-<!-- Play Button -->
+<!-- Play -->
 <button class="play-btn" id="playBtn" onclick="handlePlay()">
-  <span class="btn-text" id="playBtnText">
+  <span class="btn-text">
     <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"
       style="margin-right:4px;vertical-align:middle"><path d="M8 5v14l11-7z"/></svg>
-    Read Aloud
+    Generate &amp; Read
   </span>
   <div class="spinner"></div>
 </button>
-<div class="no-api-note" id="apiNote">
-  API 키 없이 바로 사용 가능 &nbsp;·&nbsp; 키가 있으면 Claude가 문장을 자연스럽게 다듬어 줍니다
-</div>
 
 <!-- Result -->
 <div class="result-card" id="resultCard">
-  <div class="result-label" id="resultLabel">Reading Text</div>
+  <div class="result-label" id="resultLabel">OpenAI TTS</div>
   <div class="result-text" id="resultText"></div>
   <div class="result-tip" id="resultTip" style="display:none"></div>
-  <div class="tts-controls" id="ttsControls">
-    <button class="tts-btn" onclick="speakText()">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
-      Play
+  <div class="audio-controls">
+    <button class="ctrl-btn" onclick="replayAudio()">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>
+      Replay
     </button>
-    <button class="tts-btn stop" onclick="stopSpeech()">
-      <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+    <button class="ctrl-btn stop" onclick="stopAudio()">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="currentColor">
         <rect x="6" y="6" width="12" height="12" rx="2"/>
       </svg>
       Stop
     </button>
   </div>
-  <!-- Speed + voice inside result card -->
-  <div class="voice-row" id="voiceRow" style="display:none">
-    <div class="speed-group">
-      <label>Speed</label>
-      <input type="range" id="rateRange" min="0.7" max="1.3" step="0.05" value="0.95"
-        oninput="document.getElementById('rateVal').textContent=parseFloat(this.value).toFixed(2)">
-      <span class="range-val" id="rateVal">0.95</span>
-    </div>
-    <select class="voice-select" id="voiceSelect"></select>
+  <div class="speed-row">
+    <label>Speed</label>
+    <input type="range" id="speedRange" min="0.7" max="1.4" step="0.05" value="1.0"
+      oninput="document.getElementById('speedVal').textContent=parseFloat(this.value).toFixed(2)">
+    <span class="speed-val" id="speedVal">1.00</span>
   </div>
 </div>
 
 <!-- Toast -->
 <div class="toast" id="toast"></div>
 
-<!-- API Key Modal -->
+<!-- API Keys Modal -->
 <div class="modal-bg" id="modalBg" onclick="handleModalBgClick(event)">
   <div class="modal">
-    <h2>Anthropic API Key <span style="font-size:12px;color:var(--text2);font-weight:400">(선택)</span></h2>
-    <p>입력하면 Claude가 톤·배경에 맞게 문장을 자연스럽게 다듬어 줍니다.<br>
-       없어도 앱은 바로 작동합니다. 키는 이 기기에만 저장됩니다.</p>
-    <input type="password" id="apiKeyInput" placeholder="sk-ant-..." autocomplete="off" />
+    <h2>API Keys</h2>
+    <div class="modal-sub">OpenAI는 TTS(음성 생성)에 필요합니다. Claude는 문장을 더 자연스럽게 다듬는 선택 기능입니다.</div>
+
+    <div class="modal-field">
+      <label>OpenAI API Key (필수)</label>
+      <input type="password" id="openaiKeyInput" placeholder="sk-..." autocomplete="off" />
+    </div>
+
+    <hr class="modal-divider" />
+
+    <div class="modal-field">
+      <label>Anthropic Claude API Key (선택 — 텍스트 다듬기)</label>
+      <input type="password" id="claudeKeyInput" placeholder="sk-ant-..." autocomplete="off" />
+    </div>
+
     <div class="modal-btns">
-      <button class="modal-cancel" onclick="closeApiModal()">취소</button>
-      <button class="modal-save" onclick="saveApiKey()">저장</button>
+      <button class="modal-cancel" onclick="closeKeyModal()">취소</button>
+      <button class="modal-save" onclick="saveKeys()">저장</button>
     </div>
   </div>
 </div>
 
 <script>
+// ── State ──────────────────────────────────────────────────────────────────
+let selectedVoice = 'nova';
 let selectedTone = 'Neutral';
 let selectedContext = 'General';
-let voices = [];
 let lastText = '';
+let lastArrayBuffer = null;
+let audioCtx = null;
+let currentSource = null;
 
-// Voice quality ranking — higher = better
-function voiceScore(v) {
-  const n = v.name.toLowerCase();
-  if (n.includes('enhanced') || n.includes('premium') || n.includes('neural')) return 4;
-  if (['samantha','daniel','karen','moira','alex','victoria'].some(k => n.includes(k))) return 3;
-  if (n.includes('google') && v.lang === 'en-US') return 2;
-  if (v.lang === 'en-US') return 1;
-  return 0;
-}
-
+// ── Init ───────────────────────────────────────────────────────────────────
 window.addEventListener('DOMContentLoaded', () => {
-  updateApiBtn();
-  setupChips();
+  updateKeyBtn();
+  setupChips('#voiceGrid .v-chip', v => selectedVoice = v);
+  setupChips('#toneChips .chip',   v => selectedTone = v);
   setupCtxCards();
-  loadVoices();
-  window.speechSynthesis.onvoiceschanged = loadVoices;
   renderPronList();
   document.getElementById('pronWord').addEventListener('keydown', e => { if (e.key === 'Enter') addPron(); });
   document.getElementById('pronSay').addEventListener('keydown',  e => { if (e.key === 'Enter') addPron(); });
 });
 
-function loadVoices() {
-  const all = window.speechSynthesis.getVoices().filter(v => v.lang.startsWith('en'));
-  // sort best first
-  all.sort((a, b) => voiceScore(b) - voiceScore(a));
-  voices = all;
-
-  const sel = document.getElementById('voiceSelect');
-  sel.innerHTML = voices.map((v, i) =>
-    `<option value="${i}">${v.name} (${v.lang})</option>`
-  ).join('');
-  // best voice is index 0 after sort
-  sel.value = 0;
-
-  if (voices.length) document.getElementById('voiceRow').style.display = 'flex';
-}
-
-function setupChips() {
-  document.querySelectorAll('#toneChips .chip').forEach(c => {
+function setupChips(selector, onChange) {
+  const chips = document.querySelectorAll(selector);
+  chips.forEach(c => {
     c.addEventListener('click', () => {
-      document.querySelectorAll('#toneChips .chip').forEach(x => x.classList.remove('active'));
+      chips.forEach(x => x.classList.remove('active'));
       c.classList.add('active');
-      selectedTone = c.dataset.val;
+      onChange(c.dataset.val);
     });
   });
 }
@@ -697,44 +528,95 @@ function setupCtxCards() {
   });
 }
 
-// Claude prompt — convey tone through punctuation & word choice, not speech params
-function buildPrompt(sentence) {
-  return `You are a speech writer preparing text for a text-to-speech voice.
-
-Rewrite this English sentence so it sounds completely natural and human when read aloud, matching the requested tone and context.
-
-Original sentence: "${sentence}"
-Tone: ${selectedTone}
-Context: ${selectedContext}
-
-Rules:
-- Use punctuation to create natural breathing and pacing:
-  commas (,) for a brief pause · em-dashes (—) for a dramatic beat · ellipses (...) for a trailing thought · periods for a full stop
-- Match contractions to tone: use them freely for Casual/Friendly, avoid for Formal/News Anchor
-- Choose vocabulary that fits the tone — plain and warm for Casual, precise for Formal, vivid for Storytelling
-- Keep the core meaning of the original
-- Write ONLY what should be spoken — no stage directions, no brackets, no quotation marks
-
-Also write one short, specific tip (max 15 words) on what the speaker should feel or emphasize.
-
-Return only this JSON, nothing else:
-{"adapted":"...","tip":"..."}`;
+// ── TTS Instructions ───────────────────────────────────────────────────────
+function buildInstructions() {
+  const toneMap = {
+    'Neutral':      'Speak naturally and clearly at a comfortable pace.',
+    'Formal':       'Use a formal, measured, professional tone. Enunciate carefully. Avoid contractions.',
+    'Casual':       'Speak casually and warmly, like talking to a close friend. Relaxed and natural.',
+    'Dramatic':     'Speak with dramatic emphasis. Use deliberate pauses. Vary pace to build tension.',
+    'Friendly':     'Be warm, enthusiastic, and encouraging. Let your smile come through your voice.',
+    'News Anchor':  'Read like a professional news anchor — clear, authoritative, steady rhythm.',
+    'Storytelling': 'Narrate like a storyteller. Paint the scene. Vary pace and energy for atmosphere.',
+    'Confident':    'Project confidence and authority. Steady, full voice with strong conviction.',
+  };
+  const ctxMap = {
+    'General':                  '',
+    'Business Meeting':         'The context is a professional business meeting.',
+    'Presentation':             'You are presenting to an audience. Project clearly.',
+    'Casual Conversation':      'This is a relaxed casual conversation.',
+    'News Broadcast':           'This is a live news broadcast.',
+    'Storytelling / Narration': 'You are narrating a story.',
+  };
+  return [toneMap[selectedTone] || '', ctxMap[selectedContext] || ''].filter(Boolean).join(' ');
 }
 
+// ── Play ───────────────────────────────────────────────────────────────────
 async function handlePlay() {
   const sentence = document.getElementById('sentence').value.trim();
   if (!sentence) { showToast('문장을 입력해 주세요'); return; }
 
-  const apiKey = localStorage.getItem('anthropic_api_key');
+  const openaiKey = localStorage.getItem('openai_key');
+  if (!openaiKey) { openKeyModal(); return; }
 
-  if (!apiKey) {
-    lastText = sentence;
-    showResult(sentence, '', 'Reading Text');
-    speakText(); // safe: called directly from user gesture
-    return;
-  }
+  // Unlock AudioContext synchronously inside the gesture handler
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  audioCtx.resume();
 
   setLoading(true);
+
+  let textToSpeak = applyPronunciations(sentence);
+
+  // Optional Claude text refinement
+  const claudeKey = localStorage.getItem('anthropic_api_key');
+  let claudeAdapted = null;
+  if (claudeKey) {
+    claudeAdapted = await claudeRefine(textToSpeak, claudeKey);
+    if (claudeAdapted) textToSpeak = claudeAdapted;
+  }
+
+  lastText = textToSpeak;
+
+  try {
+    const speed = parseFloat(document.getElementById('speedRange').value);
+    const res = await fetch('https://api.openai.com/v1/audio/speech', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${openaiKey}`
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini-tts',
+        input: textToSpeak,
+        voice: selectedVoice,
+        instructions: buildInstructions(),
+        response_format: 'mp3',
+        speed: speed
+      })
+    });
+
+    if (!res.ok) {
+      const err = await res.json().catch(() => ({}));
+      throw new Error(err?.error?.message || `HTTP ${res.status}`);
+    }
+
+    const buf = await res.arrayBuffer();
+    lastArrayBuffer = buf.slice(0);
+
+    const label = claudeAdapted ? 'Claude + OpenAI TTS' : 'OpenAI TTS';
+    const tip = claudeAdapted && claudeAdapted !== sentence ? null : null;
+    showResult(textToSpeak, label);
+    await playBuffer(lastArrayBuffer.slice(0));
+
+  } catch (e) {
+    showToast('오류: ' + e.message);
+  } finally {
+    setLoading(false);
+  }
+}
+
+// ── Claude refinement (optional) ───────────────────────────────────────────
+async function claudeRefine(text, apiKey) {
   try {
     const res = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
@@ -747,46 +629,60 @@ async function handlePlay() {
       body: JSON.stringify({
         model: 'claude-haiku-4-5-20251001',
         max_tokens: 300,
-        messages: [{ role: 'user', content: buildPrompt(sentence) }]
+        messages: [{
+          role: 'user',
+          content: `Lightly rewrite this sentence to sound more natural when spoken aloud. Fix awkward phrasing and improve flow. Keep the meaning identical. Return ONLY the rewritten sentence, no quotes, no explanation.\n\n"${text}"`
+        }]
       })
     });
-
-    if (!res.ok) {
-      showToast('Claude 오류 — 원문으로 읽습니다');
-      lastText = sentence;
-      showResult(sentence, '', 'Reading Text');
-      pulsePlayBtn();
-      return;
-    }
-
+    if (!res.ok) return null;
     const data = await res.json();
-    const raw = (data.content?.[0]?.text || '').replace(/```json|```/g, '').trim();
-    let parsed;
-    try { parsed = JSON.parse(raw); }
-    catch { parsed = { adapted: sentence, tip: '' }; }
-
-    lastText = parsed.adapted || sentence;
-    showResult(lastText, parsed.tip || '', "Claude's Adapted Text");
-    // Don't auto-play here — iOS Safari blocks speech from async callbacks.
-    // Pulse the Play button so the user knows to tap it.
-    pulsePlayBtn();
-  } catch (e) {
-    showToast('오류: ' + e.message);
-  } finally {
-    setLoading(false);
+    return (data.content?.[0]?.text || '').trim().replace(/^["']|["']$/g, '') || null;
+  } catch {
+    return null;
   }
 }
 
-function showResult(text, tip, label) {
+// ── Audio playback ─────────────────────────────────────────────────────────
+async function playBuffer(arrayBuffer) {
+  stopAudio();
+  const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
+  currentSource = audioCtx.createBufferSource();
+  currentSource.buffer = audioBuffer;
+  currentSource.connect(audioCtx.destination);
+  currentSource.start(0);
+}
+
+async function replayAudio() {
+  if (!lastArrayBuffer) return;
+  if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  await audioCtx.resume();
+  await playBuffer(lastArrayBuffer.slice(0));
+}
+
+function stopAudio() {
+  if (currentSource) { try { currentSource.stop(); } catch {} currentSource = null; }
+}
+
+function showResult(text, label) {
   document.getElementById('resultLabel').textContent = label;
   document.getElementById('resultText').textContent = text;
-  const tipEl = document.getElementById('resultTip');
-  if (tip) { tipEl.textContent = '💡 ' + tip; tipEl.style.display = ''; }
-  else { tipEl.style.display = 'none'; }
+  document.getElementById('resultTip').style.display = 'none';
   document.getElementById('resultCard').classList.add('visible');
-  document.getElementById('ttsControls').classList.add('visible');
-  document.getElementById('voiceRow').style.display = voices.length ? 'flex' : 'none';
 }
+
+function setLoading(on) {
+  const btn = document.getElementById('playBtn');
+  btn.classList.toggle('loading', on);
+  btn.disabled = on;
+}
+
+// ── Pronunciation Dictionary ───────────────────────────────────────────────
+function getPronDict() {
+  try { return JSON.parse(localStorage.getItem('pron_dict') || '{}'); }
+  catch { return {}; }
+}
+function savePronDict(d) { localStorage.setItem('pron_dict', JSON.stringify(d)); }
 
 function applyPronunciations(text) {
   const dict = getPronDict();
@@ -798,47 +694,25 @@ function applyPronunciations(text) {
   return result;
 }
 
-function speakText() {
-  if (!lastText) return;
-  stopSpeech();
-  const utter = new SpeechSynthesisUtterance(applyPronunciations(lastText));
-  utter.rate = parseFloat(document.getElementById('rateRange').value);
-  utter.pitch = 1.0;
-  const idx = parseInt(document.getElementById('voiceSelect').value);
-  if (voices[idx]) utter.voice = voices[idx];
-  window.speechSynthesis.speak(utter);
-}
-
-// ── Pronunciation Dictionary ───────────────────────────────────────────────
-function getPronDict() {
-  try { return JSON.parse(localStorage.getItem('pron_dict') || '{}'); }
-  catch { return {}; }
-}
-function savePronDict(dict) {
-  localStorage.setItem('pron_dict', JSON.stringify(dict));
-}
-
 function togglePron() {
-  const toggle = document.getElementById('pronToggle');
-  const body = document.getElementById('pronBody');
-  toggle.classList.toggle('open');
-  body.classList.toggle('visible');
+  document.getElementById('pronToggle').classList.toggle('open');
+  document.getElementById('pronBody').classList.toggle('visible');
 }
 
 function renderPronList() {
   const dict = getPronDict();
-  const list = document.getElementById('pronList');
   const entries = Object.entries(dict);
+  const list = document.getElementById('pronList');
   if (!entries.length) {
     list.innerHTML = '<div class="pron-empty">등록된 발음이 없습니다</div>';
     return;
   }
-  list.innerHTML = entries.map(([word, say]) => `
+  list.innerHTML = entries.map(([w, s]) => `
     <div class="pron-row">
-      <span class="pron-word">${esc(word)}</span>
+      <span class="pron-word">${esc(w)}</span>
       <span class="pron-arrow">→</span>
-      <span class="pron-say">${esc(say)}</span>
-      <button class="pron-del" onclick="deletePron('${esc(word)}')">×</button>
+      <span class="pron-say">${esc(s)}</span>
+      <button class="pron-del" onclick="deletePron('${esc(w)}')">×</button>
     </div>`).join('');
 }
 
@@ -863,13 +737,11 @@ function deletePron(word) {
 }
 
 function exportPronFile() {
-  const dict = getPronDict();
-  const entries = Object.entries(dict);
+  const entries = Object.entries(getPronDict());
   if (!entries.length) { showToast('저장된 발음이 없습니다'); return; }
   const csv = entries.map(([w, s]) => `${csvEsc(w)},${csvEsc(s)}`).join('\n');
-  const blob = new Blob([csv], { type: 'text/csv' });
   const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
+  a.href = URL.createObjectURL(new Blob([csv], { type: 'text/csv' }));
   a.download = 'pronunciation.csv';
   a.click();
 }
@@ -883,12 +755,10 @@ function importPronFile(e) {
     const dict = getPronDict();
     let added = 0;
     for (const line of lines) {
-      // support: word,say  or  word=say  or  word\tsay
       const m = line.match(/^([^,=\t]+)[,=\t](.+)$/);
       if (!m) continue;
-      const word = m[1].trim();
-      const say  = m[2].trim();
-      if (word && say) { dict[word] = say; added++; }
+      const w = m[1].trim(), s = m[2].trim();
+      if (w && s) { dict[w] = s; added++; }
     }
     savePronDict(dict);
     renderPronList();
@@ -899,71 +769,53 @@ function importPronFile(e) {
 }
 
 function csvEsc(s) {
-  return s.includes(',') || s.includes('"') ? `"${s.replace(/"/g,'""')}"` : s;
+  return s.includes(',') || s.includes('"') ? `"${s.replace(/"/g, '""')}"` : s;
 }
-
 function esc(s) {
   return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
 
-function stopSpeech() { window.speechSynthesis.cancel(); }
-
-function pulsePlayBtn() {
-  const btn = document.querySelector('#ttsControls .tts-btn');
-  if (!btn) return;
-  btn.classList.remove('pulse');
-  void btn.offsetWidth; // reflow to restart animation
-  btn.classList.add('pulse');
-  btn.addEventListener('animationend', () => btn.classList.remove('pulse'), { once: true });
-}
-
-function setLoading(on) {
-  const btn = document.getElementById('playBtn');
-  btn.classList.toggle('loading', on);
-  btn.disabled = on;
-}
-
-function openApiModal() {
-  document.getElementById('apiKeyInput').value = localStorage.getItem('anthropic_api_key') || '';
+// ── API Keys Modal ─────────────────────────────────────────────────────────
+function openKeyModal() {
+  document.getElementById('openaiKeyInput').value = localStorage.getItem('openai_key') || '';
+  document.getElementById('claudeKeyInput').value = localStorage.getItem('anthropic_api_key') || '';
   document.getElementById('modalBg').classList.add('open');
 }
-function closeApiModal() { document.getElementById('modalBg').classList.remove('open'); }
+function closeKeyModal() { document.getElementById('modalBg').classList.remove('open'); }
 
-function saveApiKey() {
-  const key = document.getElementById('apiKeyInput').value.trim();
-  if (key) {
-    localStorage.setItem('anthropic_api_key', key);
-    showToast('API 키가 저장되었습니다');
-  } else {
-    localStorage.removeItem('anthropic_api_key');
-    showToast('API 키가 삭제되었습니다');
-  }
-  updateApiBtn();
-  closeApiModal();
+function saveKeys() {
+  const oKey = document.getElementById('openaiKeyInput').value.trim();
+  const cKey = document.getElementById('claudeKeyInput').value.trim();
+  if (oKey) localStorage.setItem('openai_key', oKey);
+  else localStorage.removeItem('openai_key');
+  if (cKey) localStorage.setItem('anthropic_api_key', cKey);
+  else localStorage.removeItem('anthropic_api_key');
+  updateKeyBtn();
+  closeKeyModal();
+  showToast('저장되었습니다');
 }
 
-function updateApiBtn() {
-  const btn = document.getElementById('apiBtn');
-  const note = document.getElementById('apiNote');
-  const txt = document.getElementById('playBtnText');
-  const svgPlay = '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor" style="margin-right:4px;vertical-align:middle"><path d="M8 5v14l11-7z"/></svg>';
-  if (localStorage.getItem('anthropic_api_key')) {
-    btn.textContent = '● Claude ON';
-    btn.classList.add('connected');
-    note.style.display = 'none';
-    txt.innerHTML = svgPlay + 'Generate &amp; Read';
+function updateKeyBtn() {
+  const btn = document.getElementById('keyBtn');
+  const hasOpenAI = !!localStorage.getItem('openai_key');
+  const hasClaude = !!localStorage.getItem('anthropic_api_key');
+  if (hasOpenAI && hasClaude) {
+    btn.textContent = '● OpenAI + Claude';
+    btn.classList.add('ready');
+  } else if (hasOpenAI) {
+    btn.textContent = '● OpenAI Ready';
+    btn.classList.add('ready');
   } else {
-    btn.textContent = 'Claude (선택)';
-    btn.classList.remove('connected');
-    note.style.display = '';
-    txt.innerHTML = svgPlay + 'Read Aloud';
+    btn.textContent = 'API Keys';
+    btn.classList.remove('ready');
   }
 }
 
 function handleModalBgClick(e) {
-  if (e.target === document.getElementById('modalBg')) closeApiModal();
+  if (e.target === document.getElementById('modalBg')) closeKeyModal();
 }
 
+// ── Toast ──────────────────────────────────────────────────────────────────
 let toastTimer;
 function showToast(msg) {
   const t = document.getElementById('toast');
