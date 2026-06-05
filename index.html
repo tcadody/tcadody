@@ -580,44 +580,23 @@ async function handlePlay() {
 
   try {
     const speed = parseFloat(document.getElementById('speedRange').value);
+    const instructions = buildInstructions();
     const label = claudeAdapted ? 'Claude + OpenAI TTS' : 'OpenAI TTS';
 
-    // 1st attempt: gpt-4o-mini-tts with instructions
-    const res = await fetch('https://api.openai.com/v1/audio/speech', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${openaiKey}` },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini-tts',
-        input: textToSpeak,
-        voice: selectedVoice,
-        instructions: buildInstructions(),
-        response_format: 'mp3',
-        speed: speed
-      })
-    });
+    // Split into ≤7000-char chunks at sentence boundaries
+    // (2000 token limit ≈ ~7500 chars; 7000 gives a safe buffer for instructions)
+    const chunks = splitSentences(textToSpeak, 7000);
+    const isMulti = chunks.length > 1;
 
-    if (res.ok) {
-      const buf = await res.arrayBuffer();
-      lastChunks = [buf];
-      showResult(textToSpeak, label);
-      await playChunks([buf.slice(0)]);
-    } else {
-      const err = await res.json().catch(() => ({}));
-      const msg = err?.error?.message || '';
-      // Token limit hit → fallback: split + tts-1-hd
-      if (res.status === 400 && msg.toLowerCase().includes('token')) {
-        showToast('텍스트가 길어 분할 재생합니다 (tts-1-hd)');
-        const chunks = splitSentences(textToSpeak, 4000);
-        const buffers = await Promise.all(
-          chunks.map(c => fetchTTSChunk(c, 'tts-1-hd', null, speed, openaiKey))
-        );
-        lastChunks = buffers;
-        showResult(textToSpeak, label + ' (chunked)');
-        await playChunks(buffers.map(b => b.slice(0)));
-      } else {
-        throw new Error(msg || `HTTP ${res.status}`);
-      }
-    }
+    // Fetch all chunks in parallel — same model & instructions for every chunk
+    const buffers = await Promise.all(
+      chunks.map(c => fetchTTSChunk(c, 'gpt-4o-mini-tts', instructions, speed, openaiKey))
+    );
+
+    lastChunks = buffers;
+    showResult(textToSpeak, label + (isMulti ? ` (${chunks.length} parts)` : ''));
+    await playChunks(buffers.map(b => b.slice(0)));
+
   } catch (e) {
     showToast('오류: ' + e.message);
   } finally {
